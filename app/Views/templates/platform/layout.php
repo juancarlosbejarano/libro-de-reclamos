@@ -19,6 +19,9 @@ $puser = $_SESSION['platform_user'] ?? null;
       <a href="/platform/jobs" class="btn"><?= htmlspecialchars($t('platform.jobs')) ?></a>
       <a href="/platform/reports" class="btn"><?= htmlspecialchars($t('platform.reports')) ?></a>
       <a href="/platform/settings/arca" class="btn"><?= htmlspecialchars($t('platform.arca_settings')) ?></a>
+      <?php if ($puser && (($puser['role'] ?? '') === 'owner')): ?>
+        <a href="/update.php" class="btn danger"><?= htmlspecialchars($t('platform.update')) ?></a>
+      <?php endif; ?>
       <span class="muted" style="margin-left:auto">
         <?= $puser ? htmlspecialchars((string)$puser['email']) : htmlspecialchars($t('nav.guest')) ?>
       </span>

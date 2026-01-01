@@ -115,6 +115,7 @@ return [
   'platform.id_type' => 'Document type',
   'platform.id_number' => 'Number',
   'platform.arca_settings' => 'Arca API',
+  'platform.update' => 'Update',
   'platform.arca_settings_help' => 'Configure the token used to lookup RUC/DNI. It is stored in the database.',
   'platform.api_token' => 'API Token',
   'platform.address_full' => 'Full address',

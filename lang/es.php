@@ -115,6 +115,7 @@ return [
   'platform.id_type' => 'Tipo de documento',
   'platform.id_number' => 'Número',
   'platform.arca_settings' => 'API Arca',
+  'platform.update' => 'Actualizar',
   'platform.arca_settings_help' => 'Configura el token para consultar RUC/DNI. Se guarda en la base de datos.',
   'platform.api_token' => 'API Token',
   'platform.address_full' => 'Dirección completa',
