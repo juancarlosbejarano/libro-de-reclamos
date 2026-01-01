@@ -67,7 +67,9 @@ final class PleskClient
             if ($ok) {
                 return ['ok' => true, 'status' => $status, 'body' => (string)$body];
             }
-            $detail = self::extractError((string)$body) ?? self::summarizeBody((string)$body);
+            $detail = self::extractError((string)$body)
+                ?? self::summarizeBody((string)$body)
+                ?? self::rawSnippet((string)$body);
             return [
                 'ok' => false,
                 'status' => $status,
@@ -97,7 +99,9 @@ final class PleskClient
         if ($ok) {
             return ['ok' => true, 'status' => 200, 'body' => (string)$body];
         }
-        $detail = self::extractError((string)$body) ?? self::summarizeBody((string)$body);
+        $detail = self::extractError((string)$body)
+            ?? self::summarizeBody((string)$body)
+            ?? self::rawSnippet((string)$body);
         return [
             'ok' => false,
             'status' => 200,
@@ -189,5 +193,20 @@ final class PleskClient
             $text = substr($text, 0, $max) . '…';
         }
         return $text;
+    }
+
+    private static function rawSnippet(string $body): ?string
+    {
+        $body = trim($body);
+        if ($body === '') return null;
+        $body = preg_replace('~\s+~', ' ', $body);
+        $body = trim((string)$body);
+        if ($body === '') return null;
+
+        $max = 220;
+        if (strlen($body) > $max) {
+            $body = substr($body, 0, $max) . '…';
+        }
+        return 'raw: ' . $body;
     }
 }
