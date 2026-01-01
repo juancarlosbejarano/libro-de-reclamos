@@ -417,24 +417,30 @@ try {
 
     // 2) Seed platform tenant + domain
     $platformTenantName = $appName . ' (Plataforma)';
-    $pdo->prepare('INSERT INTO tenants (slug, name, created_at) VALUES (\'platform\', :name, NOW()) ON DUPLICATE KEY UPDATE name=VALUES(name)')
+    $pdo->prepare("INSERT INTO tenants (slug, name, created_at) VALUES ('platform', :name, NOW()) ON DUPLICATE KEY UPDATE name=VALUES(name)")
         ->execute(['name' => $platformTenantName]);
 
     $tenantId = (int)$pdo->query("SELECT id FROM tenants WHERE slug='platform' LIMIT 1")->fetchColumn();
     if ($tenantId <= 0) throw new RuntimeException('No se pudo resolver tenant platform');
 
-    $pdo->prepare('INSERT INTO tenant_domains (tenant_id, domain, kind, is_primary, verified_at, created_at) VALUES (:tid, :domain, \"platform\", 1, NOW(), NOW()) ON DUPLICATE KEY UPDATE kind=\"platform\", is_primary=1, verified_at=NOW()')
+    $pdo->prepare("INSERT INTO tenant_domains (tenant_id, domain, kind, is_primary, verified_at, created_at)
+                   VALUES (:tid, :domain, 'platform', 1, NOW(), NOW())
+                   ON DUPLICATE KEY UPDATE kind='platform', is_primary=1, verified_at=NOW()")
         ->execute(['tid' => $tenantId, 'domain' => $platformBaseDomain]);
 
     // 3) Create/update platform owner user
     $ownerHash = password_hash($ownerPass, PASSWORD_BCRYPT);
-    $pdo->prepare('INSERT INTO platform_users (email, password_hash, role, created_at) VALUES (:email, :hash, \"owner\", NOW()) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), role=\"owner\"')
+    $pdo->prepare("INSERT INTO platform_users (email, password_hash, role, created_at)
+                   VALUES (:email, :hash, 'owner', NOW())
+                   ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), role='owner'")
         ->execute(['email' => $ownerEmail, 'hash' => $ownerHash]);
 
     // 4) Optional: create tenant admin for platform tenant
     if ($createTenantAdmin) {
         $adminHash = password_hash($tenantAdminPass, PASSWORD_BCRYPT);
-        $pdo->prepare('INSERT INTO users (tenant_id, email, password_hash, role, created_at) VALUES (:tid, :email, :hash, \"admin\", NOW()) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), role=\"admin\"')
+        $pdo->prepare("INSERT INTO users (tenant_id, email, password_hash, role, created_at)
+                   VALUES (:tid, :email, :hash, 'admin', NOW())
+                   ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), role='admin'")
             ->execute(['tid' => $tenantId, 'email' => $tenantAdminEmail, 'hash' => $adminHash]);
     }
 
