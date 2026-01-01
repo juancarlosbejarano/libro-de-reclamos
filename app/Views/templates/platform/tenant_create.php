@@ -33,10 +33,10 @@ ob_start();
   <hr style="margin:16px 0" />
 
   <label><?= htmlspecialchars($t('auth.company')) ?></label>
-  <input name="name" maxlength="180" required value="<?= htmlspecialchars((string)($form['name'] ?? '')) ?>" />
+  <input name="name" maxlength="180" value="<?= htmlspecialchars((string)($form['name'] ?? '')) ?>" />
 
   <label><?= htmlspecialchars($t('auth.subdomain')) ?></label>
-  <input name="slug" maxlength="64" required value="<?= htmlspecialchars((string)($form['slug'] ?? '')) ?>" placeholder="miempresa" />
+  <input name="slug" maxlength="64" value="<?= htmlspecialchars((string)($form['slug'] ?? '')) ?>" placeholder="miempresa" />
 
   <div style="margin-top:12px">
     <button class="btn primary" type="submit" name="mode" value="create"><?= htmlspecialchars($t('platform.create')) ?></button>

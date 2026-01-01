@@ -84,7 +84,7 @@ final class PlatformTenantsController
                 return Response::html(View::render('platform/tenant_create', ['form' => $form]));
             } catch (\Throwable $e) {
                 return Response::html(View::render('platform/tenant_create', [
-                    'error' => 'No se pudo consultar',
+                    'error' => 'No se pudo consultar: ' . $e->getMessage(),
                     'form' => $form,
                 ]), 500);
             }

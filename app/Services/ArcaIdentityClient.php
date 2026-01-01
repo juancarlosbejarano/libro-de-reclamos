@@ -56,14 +56,23 @@ final class ArcaIdentityClient
 
     private static function token(): string
     {
-        $row = SystemKV::get('arca_api_token_enc');
-        if (!$row) {
+        // Prefer plaintext storage to avoid crypto/key issues in some hostings.
+        $plain = SystemKV::get('arca_api_token');
+        if ($plain) {
+            $token = trim((string)($plain['v'] ?? ''));
+            if ($token !== '') return $token;
+        }
+
+        // Backwards-compatible fallback: legacy encrypted storage.
+        $legacy = SystemKV::get('arca_api_token_enc');
+        if (!$legacy) {
             throw new \RuntimeException('arca_token_missing');
         }
-        $packed = (string)($row['v'] ?? '');
-        if ($packed === '') {
+        $packed = (string)($legacy['v'] ?? '');
+        if (trim($packed) === '') {
             throw new \RuntimeException('arca_token_missing');
         }
+
         return Crypto::decrypt($packed);
     }
 
