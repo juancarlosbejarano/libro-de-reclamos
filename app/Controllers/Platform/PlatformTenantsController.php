@@ -6,12 +6,14 @@ namespace App\Controllers\Platform;
 use App\Http\Request;
 use App\Http\Response;
 use App\Models\DB;
+use App\Models\DomainProvisioningJob;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Views\View;
 use App\Support\Csrf;
 use App\Support\Env;
 use App\Services\ArcaIdentityClient;
+use App\Services\DomainVerifier;
 
 final class PlatformTenantsController
 {
@@ -178,8 +180,11 @@ final class PlatformTenantsController
             return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
         }
 
+        $domains = TenantDomain::listForTenant($id);
+
         return Response::html(View::render('platform/tenant_edit', [
             'tenant' => $tenant,
+            'domains' => $domains,
             'saved' => $request->query['saved'] ?? null,
             'error' => $request->query['error'] ?? null,
         ]));
@@ -193,6 +198,8 @@ final class PlatformTenantsController
         $id = (int)($params['id'] ?? 0);
         $tenant = $id > 0 ? Tenant::findById($id) : null;
         if (!$tenant) return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+
+        $domains = TenantDomain::listForTenant($id);
 
         if (!Csrf::verify($request->post['_csrf'] ?? null)) {
             return Response::redirect('/platform/tenants/' . $id . '/edit?error=csrf');
@@ -221,16 +228,16 @@ final class PlatformTenantsController
         $tenantForm['slug'] = $slug;
 
         if ($name === '') {
-            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'Completa el nombre']), 422);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'domains' => $domains, 'error' => 'Completa el nombre']), 422);
         }
 
         // Prevent changing the platform tenant slug.
         if (((string)($tenant['slug'] ?? '')) === 'platform' && $slug !== 'platform') {
-            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'No se puede cambiar el subdominio del tenant platform']), 422);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'domains' => $domains, 'error' => 'No se puede cambiar el subdominio del tenant platform']), 422);
         }
 
         if ($slug === '') {
-            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'Completa el subdominio']), 422);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'domains' => $domains, 'error' => 'Completa el subdominio']), 422);
         }
 
         // slug: only [a-z0-9-], 3..32
@@ -239,7 +246,7 @@ final class PlatformTenantsController
             if ($slugRaw !== '' && str_contains($slugRaw, '.')) {
                 $msg = 'Subdominio inválido. Ingresa solo la etiqueta (ej: "ad"), no el dominio completo.';
             }
-            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => $msg]), 422);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'domains' => $domains, 'error' => $msg]), 422);
         }
 
         $logoPath = (string)($tenant['logo_path'] ?? '');
@@ -249,10 +256,10 @@ final class PlatformTenantsController
             $ext = pathinfo($original, PATHINFO_EXTENSION);
             $ext = is_string($ext) ? strtolower($ext) : '';
             if (!in_array($ext, ['png', 'jpg', 'jpeg', 'webp'], true)) {
-                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'Formato de logo inválido (usa PNG/JPG/WebP)']), 422);
+                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'domains' => $domains, 'error' => 'Formato de logo inválido (usa PNG/JPG/WebP)']), 422);
             }
             if (!@getimagesize((string)$logo['tmp_name'])) {
-                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'El archivo no parece una imagen válida']), 422);
+                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'domains' => $domains, 'error' => 'El archivo no parece una imagen válida']), 422);
             }
 
             $base = realpath(__DIR__ . '/../../../') ?: (__DIR__ . '/../../../');
@@ -295,7 +302,154 @@ final class PlatformTenantsController
             return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
         } catch (\Throwable $e) {
             $pdo->rollBack();
-            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => $e->getMessage()]), 422);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'domains' => $domains, 'error' => $e->getMessage()]), 422);
+        }
+    }
+
+    public function domainsAdd(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+
+        $id = (int)($params['id'] ?? 0);
+        $tenant = $id > 0 ? Tenant::findById($id) : null;
+        if (!$tenant) return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants/' . $id . '/edit?error=csrf');
+        }
+
+        $domainRaw = (string)($request->post['domain'] ?? '');
+        $domain = DomainVerifier::normalizeDomain($domainRaw);
+        $makePrimary = isset($request->post['is_primary']) && (string)$request->post['is_primary'] === '1';
+
+        if ($domain === '') {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => 'Dominio requerido']), 422);
+        }
+
+        if (TenantDomain::domainExists($domain, $id)) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => 'Ese dominio ya está en uso']), 409);
+        }
+
+        $requiresVerify = Env::bool('DOMAIN_VERIFY_REQUIRED', true);
+        $verified = false;
+        if ($requiresVerify) {
+            $vr = DomainVerifier::verifyCustomDomain($domain, (string)($tenant['slug'] ?? ''));
+            if (!$vr['ok']) {
+                $domains = TenantDomain::listForTenant($id);
+                return Response::html(View::render('platform/tenant_edit', [
+                    'tenant' => $tenant,
+                    'domains' => $domains,
+                    'error' => 'Dominio no verificado (' . $vr['reason'] . '). Revisa DNS A/CNAME y vuelve a intentar.',
+                ]), 422);
+            }
+            $verified = true;
+        }
+
+        try {
+            TenantDomain::addCustom($id, $domain, $makePrimary, $verified);
+            if ($verified && Env::bool('PLESK_AUTO_PROVISION', true)) {
+                DomainProvisioningJob::enqueueAliasCreate($id, $domain);
+            }
+            return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+        } catch (\Throwable $e) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => 'No se pudo agregar dominio (¿ya existe?): ' . $e->getMessage()]), 409);
+        }
+    }
+
+    public function domainsVerify(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+
+        $id = (int)($params['id'] ?? 0);
+        $domainId = (int)($params['domainId'] ?? 0);
+        $tenant = $id > 0 ? Tenant::findById($id) : null;
+        if (!$tenant) return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants/' . $id . '/edit?error=csrf');
+        }
+
+        $row = TenantDomain::findForTenant($id, $domainId);
+        if (!$row) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => 'Dominio no encontrado']), 404);
+        }
+        if ((string)($row['kind'] ?? '') !== 'custom') {
+            return Response::redirect('/platform/tenants/' . $id . '/edit');
+        }
+
+        $vr = DomainVerifier::verifyCustomDomain((string)($row['domain'] ?? ''), (string)($tenant['slug'] ?? ''));
+        if (!$vr['ok']) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', [
+                'tenant' => $tenant,
+                'domains' => $domains,
+                'error' => 'Dominio no verificado (' . $vr['reason'] . '). Revisa DNS A/CNAME y vuelve a intentar.',
+            ]), 422);
+        }
+
+        TenantDomain::markVerifiedForTenant($id, $domainId);
+        if (Env::bool('PLESK_AUTO_PROVISION', true)) {
+            DomainProvisioningJob::enqueueAliasCreate($id, (string)($row['domain'] ?? ''));
+        }
+
+        return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+    }
+
+    public function domainsPrimary(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+
+        $id = (int)($params['id'] ?? 0);
+        $domainId = (int)($params['domainId'] ?? 0);
+        $tenant = $id > 0 ? Tenant::findById($id) : null;
+        if (!$tenant) return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants/' . $id . '/edit?error=csrf');
+        }
+
+        $row = TenantDomain::findForTenant($id, $domainId);
+        if (!$row) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => 'Dominio no encontrado']), 404);
+        }
+
+        if ((string)($row['kind'] ?? '') === 'custom' && Env::bool('DOMAIN_VERIFY_REQUIRED', true) && empty($row['verified_at'])) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => 'Primero verifica el dominio antes de marcarlo como principal']), 422);
+        }
+
+        TenantDomain::setPrimaryForTenant($id, $domainId);
+        return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+    }
+
+    public function domainsDelete(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+
+        $id = (int)($params['id'] ?? 0);
+        $domainId = (int)($params['domainId'] ?? 0);
+        $tenant = $id > 0 ? Tenant::findById($id) : null;
+        if (!$tenant) return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants/' . $id . '/edit?error=csrf');
+        }
+
+        try {
+            TenantDomain::deleteForTenant($id, $domainId);
+            return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+        } catch (\Throwable $e) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => $e->getMessage()]), 422);
         }
     }
 

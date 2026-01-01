@@ -76,6 +76,10 @@ final class Kernel
         $this->router->add('POST', '#^/platform/tenants/create$#', [new PlatformTenantsController(), 'store']);
         $this->router->add('GET', '#^/platform/tenants/(?P<id>\d+)/edit$#', [new PlatformTenantsController(), 'edit']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/edit$#', [new PlatformTenantsController(), 'update']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/add$#', [new PlatformTenantsController(), 'domainsAdd']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/(?P<domainId>\d+)/verify$#', [new PlatformTenantsController(), 'domainsVerify']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/(?P<domainId>\d+)/primary$#', [new PlatformTenantsController(), 'domainsPrimary']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/(?P<domainId>\d+)/delete$#', [new PlatformTenantsController(), 'domainsDelete']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/suspend$#', [new PlatformTenantsController(), 'suspend']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/reactivate$#', [new PlatformTenantsController(), 'reactivate']);
         $this->router->add('GET', '#^/platform/jobs$#', [new PlatformJobsController(), 'index']);

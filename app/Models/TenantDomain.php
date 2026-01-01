@@ -39,6 +39,75 @@ final class TenantDomain
         }
     }
 
+    /** @return array<string,mixed>|null */
+    public static function findForTenant(int $tenantId, int $domainId): ?array
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('SELECT * FROM tenant_domains WHERE tenant_id = :tid AND id = :id LIMIT 1');
+        $stmt->execute(['tid' => $tenantId, 'id' => $domainId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public static function setPrimaryForTenant(int $tenantId, int $domainId): void
+    {
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare('UPDATE tenant_domains SET is_primary = 0 WHERE tenant_id = :tid');
+            $stmt->execute(['tid' => $tenantId]);
+            $stmt = $pdo->prepare('UPDATE tenant_domains SET is_primary = 1 WHERE tenant_id = :tid AND id = :id');
+            $stmt->execute(['tid' => $tenantId, 'id' => $domainId]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public static function markVerifiedForTenant(int $tenantId, int $domainId): void
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('UPDATE tenant_domains SET verified_at = NOW() WHERE tenant_id = :tid AND id = :id');
+        $stmt->execute(['tid' => $tenantId, 'id' => $domainId]);
+    }
+
+    public static function deleteForTenant(int $tenantId, int $domainId): void
+    {
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $row = self::findForTenant($tenantId, $domainId);
+            if (!$row) {
+                throw new \RuntimeException('Dominio no encontrado');
+            }
+            if ((string)($row['kind'] ?? '') === 'subdomain') {
+                throw new \RuntimeException('No se puede eliminar el subdominio');
+            }
+            $wasPrimary = ((int)($row['is_primary'] ?? 0) === 1);
+
+            $stmt = $pdo->prepare('DELETE FROM tenant_domains WHERE tenant_id = :tid AND id = :id');
+            $stmt->execute(['tid' => $tenantId, 'id' => $domainId]);
+
+            if ($wasPrimary) {
+                $stmt = $pdo->prepare('SELECT id FROM tenant_domains WHERE tenant_id = :tid ORDER BY (kind = "subdomain") DESC, id ASC LIMIT 1');
+                $stmt->execute(['tid' => $tenantId]);
+                $nextId = (int)($stmt->fetchColumn() ?: 0);
+                if ($nextId > 0) {
+                    $stmt = $pdo->prepare('UPDATE tenant_domains SET is_primary = 0 WHERE tenant_id = :tid');
+                    $stmt->execute(['tid' => $tenantId]);
+                    $stmt = $pdo->prepare('UPDATE tenant_domains SET is_primary = 1 WHERE tenant_id = :tid AND id = :id');
+                    $stmt->execute(['tid' => $tenantId, 'id' => $nextId]);
+                }
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     public static function domainExists(string $domain, ?int $excludeTenantId = null): bool
     {
         $pdo = DB::pdo();

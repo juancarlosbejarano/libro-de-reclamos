@@ -4,6 +4,7 @@
 $tenant = is_array($tenant ?? null) ? $tenant : null;
 $error = $error ?? null;
 $saved = $saved ?? null;
+$domains = is_array($domains ?? null) ? $domains : [];
 
 ob_start();
 ?>
@@ -58,6 +59,75 @@ ob_start();
         <a class="btn" href="/platform/tenants"><?= htmlspecialchars($t('platform.tenants')) ?></a>
       </div>
     </form>
+
+    <hr style="margin:16px 0" />
+
+    <h2 style="margin:0 0 8px"><?= htmlspecialchars($t('platform.domains')) ?></h2>
+    <div class="card" style="margin-bottom:12px">
+      <p class="muted"><?= htmlspecialchars($t('settings.domain_help')) ?></p>
+    </div>
+
+    <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/add" class="card" style="margin-bottom:12px">
+      <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
+      <label><?= htmlspecialchars($t('settings.domain_label')) ?></label>
+      <input name="domain" placeholder="tudominio.com" required />
+      <label>
+        <input type="checkbox" name="is_primary" value="1" />
+        <?= htmlspecialchars($t('settings.domain_primary')) ?>
+      </label>
+      <div style="margin-top:12px">
+        <button class="btn primary" type="submit"><?= htmlspecialchars($t('settings.domain_add')) ?></button>
+      </div>
+    </form>
+
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th><?= htmlspecialchars($t('settings.domain')) ?></th>
+            <th><?= htmlspecialchars($t('settings.domain_kind')) ?></th>
+            <th><?= htmlspecialchars($t('settings.domain_primary_col')) ?></th>
+            <th><?= htmlspecialchars($t('settings.domain_verified')) ?></th>
+            <th><?= htmlspecialchars($t('platform.actions')) ?></th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($domains as $d): ?>
+            <tr>
+              <td><?= htmlspecialchars((string)$d['domain']) ?></td>
+              <td><?= htmlspecialchars((string)$d['kind']) ?></td>
+              <td><?= ((int)$d['is_primary'] === 1) ? 'yes' : 'no' ?></td>
+              <td><?= $d['verified_at'] ? htmlspecialchars((string)$d['verified_at']) : 'pending' ?></td>
+              <td>
+                <?php if ((int)($d['is_primary'] ?? 0) !== 1): ?>
+                  <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/<?= (int)$d['id'] ?>/primary" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
+                    <button class="btn" type="submit">Hacer principal</button>
+                  </form>
+                <?php endif; ?>
+
+                <?php if (((string)($d['kind'] ?? '')) === 'custom' && empty($d['verified_at'])): ?>
+                  <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/<?= (int)$d['id'] ?>/verify" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
+                    <button class="btn" type="submit">Verificar</button>
+                  </form>
+                <?php endif; ?>
+
+                <?php if (((string)($d['kind'] ?? '')) === 'custom'): ?>
+                  <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/<?= (int)$d['id'] ?>/delete" style="display:inline" onsubmit="return confirm('¿Eliminar dominio?');">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
+                    <button class="btn danger" type="submit">Eliminar</button>
+                  </form>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          <?php if (!$domains): ?>
+            <tr><td colspan="5" class="muted"><?= htmlspecialchars($t('settings.domain_none')) ?></td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
 
     <hr style="margin:16px 0" />
 
