@@ -67,7 +67,7 @@ final class PleskClient
             if ($ok) {
                 return ['ok' => true, 'status' => $status, 'body' => (string)$body];
             }
-            $detail = self::extractError((string)$body);
+            $detail = self::extractError((string)$body) ?? self::summarizeBody((string)$body);
             return [
                 'ok' => false,
                 'status' => $status,
@@ -97,7 +97,7 @@ final class PleskClient
         if ($ok) {
             return ['ok' => true, 'status' => 200, 'body' => (string)$body];
         }
-        $detail = self::extractError((string)$body);
+        $detail = self::extractError((string)$body) ?? self::summarizeBody((string)$body);
         return [
             'ok' => false,
             'status' => 200,
@@ -118,6 +118,22 @@ final class PleskClient
     private static function extractError(string $body): ?string
     {
         if ($body === '') return null;
+
+        // Fast regex fallback (works even if XML parsing fails).
+        $errtext = null;
+        $errcode = null;
+        if (preg_match('~<errtext>\s*(.*?)\s*</errtext>~is', $body, $m)) {
+            $errtext = trim(html_entity_decode((string)$m[1], ENT_QUOTES | ENT_XML1));
+        }
+        if (preg_match('~<errcode>\s*(.*?)\s*</errcode>~is', $body, $m)) {
+            $errcode = trim((string)$m[1]);
+        }
+        if (($errtext !== null && $errtext !== '') || ($errcode !== null && $errcode !== '')) {
+            if ($errtext !== null && $errtext !== '' && $errcode !== null && $errcode !== '') {
+                return $errtext . ' (code ' . $errcode . ')';
+            }
+            return ($errtext !== null && $errtext !== '') ? $errtext : ('code ' . (string)$errcode);
+        }
 
         // Try to parse Plesk XML response and extract errcode/errtext.
         $prev = libxml_use_internal_errors(true);
@@ -154,5 +170,24 @@ final class PleskClient
             libxml_clear_errors();
             libxml_use_internal_errors($prev);
         }
+    }
+
+    private static function summarizeBody(string $body): ?string
+    {
+        $body = trim($body);
+        if ($body === '') return null;
+
+        // If it's HTML (e.g., error page), strip tags to get a hint.
+        $text = strip_tags($body);
+        $text = preg_replace('~\s+~', ' ', $text);
+        $text = trim((string)$text);
+        if ($text === '') return null;
+
+        // Keep it short to avoid dumping too much into DB/UI.
+        $max = 180;
+        if (strlen($text) > $max) {
+            $text = substr($text, 0, $max) . '…';
+        }
+        return $text;
     }
 }
