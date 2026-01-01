@@ -5,6 +5,7 @@ require __DIR__ . '/../app/bootstrap.php';
 
 use App\Models\DB;
 use App\Support\Csrf;
+use App\Services\UpdateChecker;
 
 header('Content-Type: text/html; charset=utf-8');
 
@@ -36,29 +37,13 @@ if ($role !== 'owner') {
 
 $pdo = DB::pdo();
 
-/** @return bool */
-function columnExists(\PDO $pdo, string $table, string $column): bool
-{
-    $stmt = $pdo->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c');
-    $stmt->execute(['t' => $table, 'c' => $column]);
-    return ((int)$stmt->fetchColumn()) > 0;
-}
-
-/** @return bool */
-function tableExists(\PDO $pdo, string $table): bool
-{
-    $stmt = $pdo->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t');
-    $stmt->execute(['t' => $table]);
-    return ((int)$stmt->fetchColumn()) > 0;
-}
-
 $migrations = [];
 
 // Migration: ensure system_kv exists (older installs)
 $migrations[] = [
     'id' => '2026_01_01_system_kv',
     'label' => 'Ensure system_kv table exists',
-    'needed' => !tableExists($pdo, 'system_kv'),
+  'needed' => !UpdateChecker::tableExists($pdo, 'system_kv'),
     'run' => function () use ($pdo): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS system_kv (k VARCHAR(64) NOT NULL, v TEXT NOT NULL, updated_at DATETIME NOT NULL, PRIMARY KEY (k)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     },
@@ -68,13 +53,13 @@ $migrations[] = [
 $migrations[] = [
     'id' => '2026_01_01_tenants_id_fields',
     'label' => 'Add tenants.id_type and tenants.id_number',
-    'needed' => !(columnExists($pdo, 'tenants', 'id_type') && columnExists($pdo, 'tenants', 'id_number')),
+  'needed' => !(UpdateChecker::columnExists($pdo, 'tenants', 'id_type') && UpdateChecker::columnExists($pdo, 'tenants', 'id_number')),
     'run' => function () use ($pdo): void {
         // Add columns one-by-one to be safe/idempotent.
-        if (!columnExists($pdo, 'tenants', 'id_type')) {
+    if (!UpdateChecker::columnExists($pdo, 'tenants', 'id_type')) {
             $pdo->exec("ALTER TABLE tenants ADD COLUMN id_type ENUM('ruc','dni') NULL");
         }
-        if (!columnExists($pdo, 'tenants', 'id_number')) {
+    if (!UpdateChecker::columnExists($pdo, 'tenants', 'id_number')) {
             $pdo->exec("ALTER TABLE tenants ADD COLUMN id_number VARCHAR(16) NULL");
         }
     },
@@ -84,9 +69,9 @@ $migrations[] = [
 $migrations[] = [
   'id' => '2026_01_01_tenants_address_full',
   'label' => 'Add tenants.address_full',
-  'needed' => !columnExists($pdo, 'tenants', 'address_full'),
+  'needed' => !UpdateChecker::columnExists($pdo, 'tenants', 'address_full'),
   'run' => function () use ($pdo): void {
-    if (!columnExists($pdo, 'tenants', 'address_full')) {
+    if (!UpdateChecker::columnExists($pdo, 'tenants', 'address_full')) {
       $pdo->exec("ALTER TABLE tenants ADD COLUMN address_full VARCHAR(255) NULL");
     }
   },
@@ -96,15 +81,15 @@ $migrations[] = [
 $migrations[] = [
   'id' => '2026_01_01_tenants_admin_fields',
   'label' => 'Add tenants.status, tenants.suspended_at, tenants.logo_path',
-  'needed' => !(columnExists($pdo, 'tenants', 'status') && columnExists($pdo, 'tenants', 'suspended_at') && columnExists($pdo, 'tenants', 'logo_path')),
+  'needed' => !(UpdateChecker::columnExists($pdo, 'tenants', 'status') && UpdateChecker::columnExists($pdo, 'tenants', 'suspended_at') && UpdateChecker::columnExists($pdo, 'tenants', 'logo_path')),
   'run' => function () use ($pdo): void {
-    if (!columnExists($pdo, 'tenants', 'status')) {
+    if (!UpdateChecker::columnExists($pdo, 'tenants', 'status')) {
       $pdo->exec("ALTER TABLE tenants ADD COLUMN status ENUM('active','suspended') NOT NULL DEFAULT 'active'");
     }
-    if (!columnExists($pdo, 'tenants', 'suspended_at')) {
+    if (!UpdateChecker::columnExists($pdo, 'tenants', 'suspended_at')) {
       $pdo->exec("ALTER TABLE tenants ADD COLUMN suspended_at DATETIME NULL");
     }
-    if (!columnExists($pdo, 'tenants', 'logo_path')) {
+    if (!UpdateChecker::columnExists($pdo, 'tenants', 'logo_path')) {
       $pdo->exec("ALTER TABLE tenants ADD COLUMN logo_path VARCHAR(255) NULL");
     }
   },
@@ -131,10 +116,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $message = 'Update completed.';
             // Recompute needed flags after running
-            $migrations[0]['needed'] = !tableExists($pdo, 'system_kv');
-            $migrations[1]['needed'] = !(columnExists($pdo, 'tenants', 'id_type') && columnExists($pdo, 'tenants', 'id_number'));
-            $migrations[2]['needed'] = !columnExists($pdo, 'tenants', 'address_full');
-            $migrations[3]['needed'] = !(columnExists($pdo, 'tenants', 'status') && columnExists($pdo, 'tenants', 'suspended_at') && columnExists($pdo, 'tenants', 'logo_path'));
+            $migrations[0]['needed'] = !UpdateChecker::tableExists($pdo, 'system_kv');
+            $migrations[1]['needed'] = !(UpdateChecker::columnExists($pdo, 'tenants', 'id_type') && UpdateChecker::columnExists($pdo, 'tenants', 'id_number'));
+            $migrations[2]['needed'] = !UpdateChecker::columnExists($pdo, 'tenants', 'address_full');
+            $migrations[3]['needed'] = !(UpdateChecker::columnExists($pdo, 'tenants', 'status') && UpdateChecker::columnExists($pdo, 'tenants', 'suspended_at') && UpdateChecker::columnExists($pdo, 'tenants', 'logo_path'));
             $needsAny = ($migrations[0]['needed'] || $migrations[1]['needed'] || $migrations[2]['needed'] || $migrations[3]['needed']);
         } catch (Throwable $e) {
             http_response_code(500);
