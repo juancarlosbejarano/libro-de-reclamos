@@ -56,9 +56,16 @@ final class SettingsController
         if ($requiresVerify) {
             $vr = DomainVerifier::verifyCustomDomain($domain, $tenantSlug);
             if (!$vr['ok']) {
+                $base = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+                $cnameTo = ($base !== '' && $tenantSlug !== '') ? ($tenantSlug . '.' . $base) : '';
+                $hint = ' Debe apuntar por DNS (A) a 207.58.173.84';
+                if ($cnameTo !== '') {
+                    $hint .= ' o ser CNAME a ' . $cnameTo;
+                }
+                $hint .= '.';
                 $domains = TenantDomain::listForTenant($tenantId);
                 return Response::html(View::render('settings/domain', [
-                    'error' => 'Dominio no verificado (' . $vr['reason'] . '). Revisa DNS A/CNAME y vuelve a intentar.',
+                    'error' => 'Dominio no verificado (' . $vr['reason'] . ').' . $hint,
                     'domains' => $domains,
                 ]), 422);
             }

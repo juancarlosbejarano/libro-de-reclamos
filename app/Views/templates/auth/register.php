@@ -20,6 +20,7 @@ ob_start();
   <label><?= htmlspecialchars($t('auth.subdomain')) ?> (<?= htmlspecialchars((string)$base) ?>)</label>
   <input name="slug" maxlength="64" required placeholder="miempresa" />
   <p class="muted">Se creará: <strong>miempresa.<?= htmlspecialchars((string)$base) ?></strong></p>
+  <p class="muted">Si usarás un dominio propio, crea un registro A a <strong>207.58.173.84</strong> o un CNAME a <strong>miempresa.<?= htmlspecialchars((string)$base) ?></strong>.</p>
 
   <label><?= htmlspecialchars($t('auth.email')) ?></label>
   <input name="email" type="email" required />

@@ -39,6 +39,9 @@ ob_start();
         <p class="muted" style="margin-top:6px">
           Dominio: <span style="font-family: monospace"><?= htmlspecialchars((string)($tenant['slug'] ?? '')) ?>.<?= htmlspecialchars((string)$_ENV['PLATFORM_BASE_DOMAIN']) ?></span>
         </p>
+        <p class="muted" style="margin-top:6px">
+          Para usar un dominio propio, crea un registro A a <strong>207.58.173.84</strong> o un CNAME a <strong><?= htmlspecialchars((string)($tenant['slug'] ?? '')) ?>.<?= htmlspecialchars((string)$_ENV['PLATFORM_BASE_DOMAIN']) ?></strong>.
+        </p>
       <?php endif; ?>
 
       <label><?= htmlspecialchars($t('auth.company')) ?></label>

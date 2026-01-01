@@ -4,6 +4,7 @@
 
 $error = $error ?? null;
 $form = is_array($form ?? null) ? $form : [];
+$base = App\Support\Env::get('PLATFORM_BASE_DOMAIN', '');
 
 ob_start();
 ?>
@@ -40,6 +41,10 @@ ob_start();
 
   <label><?= htmlspecialchars($t('auth.subdomain')) ?></label>
   <input name="slug" maxlength="64" value="<?= htmlspecialchars((string)($form['slug'] ?? '')) ?>" placeholder="miempresa" />
+  <?php if ($base): ?>
+    <p class="muted">Se creará: <strong>miempresa.<?= htmlspecialchars((string)$base) ?></strong></p>
+    <p class="muted">Si usarás un dominio propio, crea un registro A a <strong>207.58.173.84</strong> o un CNAME a <strong>miempresa.<?= htmlspecialchars((string)$base) ?></strong>.</p>
+  <?php endif; ?>
 
   <div style="margin-top:12px">
     <button class="btn primary" type="submit" name="mode" value="create"><?= htmlspecialchars($t('platform.create')) ?></button>

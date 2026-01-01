@@ -68,7 +68,14 @@ final class RegisterController
                 if ($requiresVerify) {
                     $vr = DomainVerifier::verifyCustomDomain($normalized, $slug);
                     if (!$vr['ok']) {
-                        throw new \RuntimeException('Dominio no verificado (' . $vr['reason'] . ')');
+                        $base = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+                        $cnameTo = ($base !== '' && $slug !== '') ? ($slug . '.' . $base) : '';
+                        $hint = ' Debe apuntar por DNS (A) a 207.58.173.84';
+                        if ($cnameTo !== '') {
+                            $hint .= ' o ser CNAME a ' . $cnameTo;
+                        }
+                        $hint .= '.';
+                        throw new \RuntimeException('Dominio no verificado (' . $vr['reason'] . ').' . $hint);
                     }
                     $verified = true;
                 }

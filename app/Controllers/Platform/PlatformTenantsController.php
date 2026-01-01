@@ -348,11 +348,19 @@ final class PlatformTenantsController
         if ($requiresVerify) {
             $vr = DomainVerifier::verifyCustomDomain($domain, (string)($tenant['slug'] ?? ''));
             if (!$vr['ok']) {
+                $base = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+                $tenantSlug = (string)($tenant['slug'] ?? '');
+                $cnameTo = ($base !== '' && $tenantSlug !== '') ? ($tenantSlug . '.' . $base) : '';
+                $hint = ' Debe apuntar por DNS (A) a 207.58.173.84';
+                if ($cnameTo !== '') {
+                    $hint .= ' o ser CNAME a ' . $cnameTo;
+                }
+                $hint .= '.';
                 $domains = TenantDomain::listForTenant($id);
                 return Response::html(View::render('platform/tenant_edit', [
                     'tenant' => $tenant,
                     'domains' => $domains,
-                    'error' => 'Dominio no verificado (' . $vr['reason'] . '). Revisa DNS A/CNAME y vuelve a intentar.',
+                    'error' => 'Dominio no verificado (' . $vr['reason'] . ').' . $hint,
                 ]), 422);
             }
             $verified = true;
@@ -395,11 +403,19 @@ final class PlatformTenantsController
 
         $vr = DomainVerifier::verifyCustomDomain((string)($row['domain'] ?? ''), (string)($tenant['slug'] ?? ''));
         if (!$vr['ok']) {
+            $base = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+            $tenantSlug = (string)($tenant['slug'] ?? '');
+            $cnameTo = ($base !== '' && $tenantSlug !== '') ? ($tenantSlug . '.' . $base) : '';
+            $hint = ' Debe apuntar por DNS (A) a 207.58.173.84';
+            if ($cnameTo !== '') {
+                $hint .= ' o ser CNAME a ' . $cnameTo;
+            }
+            $hint .= '.';
             $domains = TenantDomain::listForTenant($id);
             return Response::html(View::render('platform/tenant_edit', [
                 'tenant' => $tenant,
                 'domains' => $domains,
-                'error' => 'Dominio no verificado (' . $vr['reason'] . '). Revisa DNS A/CNAME y vuelve a intentar.',
+                'error' => 'Dominio no verificado (' . $vr['reason'] . ').' . $hint,
             ]), 422);
         }
 
@@ -501,13 +517,21 @@ final class PlatformTenantsController
         if ($requiresVerify) {
             $vr = DomainVerifier::verifyCustomDomain($domain, (string)($tenant['slug'] ?? ''));
             if (!$vr['ok']) {
+                $base = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+                $tenantSlug = (string)($tenant['slug'] ?? '');
+                $cnameTo = ($base !== '' && $tenantSlug !== '') ? ($tenantSlug . '.' . $base) : '';
+                $hint = ' Debe apuntar por DNS (A) a 207.58.173.84';
+                if ($cnameTo !== '') {
+                    $hint .= ' o ser CNAME a ' . $cnameTo;
+                }
+                $hint .= '.';
                 $domains = TenantDomain::listForTenant($id);
                 $row['domain'] = $domain;
                 return Response::html(View::render('platform/tenant_edit', [
                     'tenant' => $tenant,
                     'domains' => $domains,
                     'editDomain' => $row,
-                    'error' => 'Dominio no verificado (' . $vr['reason'] . '). Revisa DNS A/CNAME y vuelve a intentar.',
+                    'error' => 'Dominio no verificado (' . $vr['reason'] . ').' . $hint,
                 ]), 422);
             }
             $verified = true;
