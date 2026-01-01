@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS tenants (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   slug VARCHAR(64) NOT NULL,
   name VARCHAR(180) NOT NULL,
+  id_type ENUM('ruc','dni') NULL,
+  id_number VARCHAR(16) NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_tenants_slug (slug)

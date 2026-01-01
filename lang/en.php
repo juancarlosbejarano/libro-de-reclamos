@@ -107,5 +107,18 @@ return [
   'platform.system_status' => 'System status',
   'platform.cron_last_run' => 'Last cron run (provision)',
   'platform.report_last_14_days' => 'Complaints per day (last 14 days)',
+  'platform.tenant_create' => 'Create company',
+  'platform.create' => 'Create',
+  'platform.lookup' => 'Lookup',
+  'platform.id_type' => 'Document type',
+  'platform.id_number' => 'Number',
+  'platform.arca_settings' => 'Arca API',
+  'platform.arca_settings_help' => 'Configure the token used to lookup RUC/DNI. It is stored encrypted in the database (requires APP_KEY).',
+  'platform.api_token' => 'API Token',
+  'platform.status' => 'Status',
+  'platform.configured' => 'Configured',
+  'platform.not_configured' => 'Not configured',
+  'platform.saved' => 'Saved',
+  'platform.error' => 'Error',
 ];
 

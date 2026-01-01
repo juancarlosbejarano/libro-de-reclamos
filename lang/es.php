@@ -107,5 +107,18 @@ return [
   'platform.system_status' => 'Estado del sistema',
   'platform.cron_last_run' => 'Última ejecución cron (provision)',
   'platform.report_last_14_days' => 'Reclamos por día (últimos 14 días)',
+  'platform.tenant_create' => 'Crear empresa',
+  'platform.create' => 'Crear',
+  'platform.lookup' => 'Consultar',
+  'platform.id_type' => 'Tipo de documento',
+  'platform.id_number' => 'Número',
+  'platform.arca_settings' => 'API Arca',
+  'platform.arca_settings_help' => 'Configura el token para consultar RUC/DNI. Se guarda cifrado en la base de datos (requiere APP_KEY).',
+  'platform.api_token' => 'API Token',
+  'platform.status' => 'Estado',
+  'platform.configured' => 'Configurado',
+  'platform.not_configured' => 'No configurado',
+  'platform.saved' => 'Guardado',
+  'platform.error' => 'Error',
 ];
 

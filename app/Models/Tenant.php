@@ -33,11 +33,16 @@ final class Tenant
         return (bool)$stmt->fetchColumn();
     }
 
-    public static function create(string $slug, string $name): int
+    public static function create(string $slug, string $name, ?string $idType = null, ?string $idNumber = null): int
     {
         $pdo = DB::pdo();
-        $stmt = $pdo->prepare('INSERT INTO tenants (slug, name, created_at) VALUES (:slug, :name, NOW())');
-        $stmt->execute(['slug' => $slug, 'name' => $name]);
+        $stmt = $pdo->prepare('INSERT INTO tenants (slug, name, id_type, id_number, created_at) VALUES (:slug, :name, :id_type, :id_number, NOW())');
+        $stmt->execute([
+            'slug' => $slug,
+            'name' => $name,
+            'id_type' => $idType,
+            'id_number' => $idNumber,
+        ]);
         return (int)$pdo->lastInsertId();
     }
 }

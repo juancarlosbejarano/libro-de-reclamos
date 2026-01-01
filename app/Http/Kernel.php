@@ -10,6 +10,7 @@ use App\Controllers\SessionController;
 use App\Controllers\Platform\PlatformDashboardController;
 use App\Controllers\Platform\PlatformJobsController;
 use App\Controllers\Platform\PlatformReportsController;
+use App\Controllers\Platform\PlatformArcaSettingsController;
 use App\Controllers\Platform\PlatformSessionController;
 use App\Controllers\Platform\PlatformTenantsController;
 use App\Controllers\Ui\ComplaintsController;
@@ -63,8 +64,14 @@ final class Kernel
         $this->router->add('POST', '#^/platform/logout$#', [$pSession, 'logout']);
         $this->router->add('GET', '#^/platform$#', [new PlatformDashboardController(), 'index']);
         $this->router->add('GET', '#^/platform/tenants$#', [new PlatformTenantsController(), 'index']);
+        $this->router->add('GET', '#^/platform/tenants/create$#', [new PlatformTenantsController(), 'create']);
+        $this->router->add('POST', '#^/platform/tenants/create$#', [new PlatformTenantsController(), 'store']);
         $this->router->add('GET', '#^/platform/jobs$#', [new PlatformJobsController(), 'index']);
         $this->router->add('GET', '#^/platform/reports$#', [new PlatformReportsController(), 'index']);
+
+        $arca = new PlatformArcaSettingsController();
+        $this->router->add('GET', '#^/platform/settings/arca$#', [$arca, 'show']);
+        $this->router->add('POST', '#^/platform/settings/arca$#', [$arca, 'save']);
 
         // UI
         $this->router->add('GET', '#^/$#', [new HomeController(), 'index']);

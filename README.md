@@ -260,12 +260,42 @@ Como dueño del sistema puedes administrar a nivel global (multi-tenant) desde:
 - `/platform/jobs` (cola de provisión Plesk: pending/failed)
 - `/platform/reports` (reclamos por día últimos 14 días)
 
+### Consulta RUC/DNI (Arca) + creación de empresas
+
+1) Configura el token (se guarda cifrado en BD):
+
+- `/platform/settings/arca`
+
+2) Crea empresas (tenants) desde:
+
+- `/platform/tenants` → **Crear empresa**
+
+En el formulario puedes ingresar **RUC** o **DNI** y presionar **Consultar** para autocompletar el nombre.
+
+> Nota: requiere `APP_KEY` válido para cifrar el token.
+
+### Nota si ya tienes BD creada (migración)
+
+Si tu base ya existe y no quieres re-importar `database/schema.sql`, aplica:
+
+```sql
+ALTER TABLE tenants
+  ADD COLUMN id_type ENUM('ruc','dni') NULL,
+  ADD COLUMN id_number VARCHAR(16) NULL;
+```
+
 ### Crear usuario de plataforma (CLI)
 
 Primero crea un usuario `owner` o `support`:
 
 ```bash
 php scripts/create_platform_user.php --email=owner@arca.digital --password=StrongPass123 --role=owner
+```
+
+Si estás parado dentro de `httpdocs/` (como suele pasar en SSH de Plesk), usa:
+
+```bash
+php ../scripts/create_platform_user.php --email=owner@arca.digital --password=StrongPass123 --role=owner
 ```
 
 Luego ingresa en `/platform/login`.
@@ -281,6 +311,16 @@ Para instalar en hosting:
 5. Al finalizar, elimina `httpdocs/install.php` del servidor por seguridad.
 
 Guía detallada de despliegue: `docs/DEPLOY_PLESK.md`
+
+## Actualizaciones (update.php)
+
+Cuando subas una nueva versión que requiera cambios en la base de datos, puedes usar:
+
+- `/update.php`
+
+Este archivo solo permite ejecución si estás logueado en `/platform/login` con un usuario `owner`.
+
+Por seguridad, luego de ejecutar, elimina `httpdocs/update.php` del servidor.
 
 
 ## API (ejemplos)

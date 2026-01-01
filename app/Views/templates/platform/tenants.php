@@ -6,6 +6,10 @@ ob_start();
 
 <h1><?= htmlspecialchars($t('platform.tenants')) ?></h1>
 
+<div style="margin:12px 0">
+  <a class="btn primary" href="/platform/tenants/create"><?= htmlspecialchars($t('platform.tenant_create')) ?></a>
+</div>
+
 <div class="card">
   <table class="table">
     <thead>
