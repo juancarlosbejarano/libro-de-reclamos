@@ -64,9 +64,16 @@ final class PleskClient
                 return ['ok' => false, 'status' => $status, 'body' => '', 'error' => $err ?: 'curl_exec_failed'];
             }
             $ok = self::looksOk((string)$body);
-            return $ok
-                ? ['ok' => true, 'status' => $status, 'body' => (string)$body]
-                : ['ok' => false, 'status' => $status, 'body' => (string)$body, 'error' => 'plesk_error'];
+            if ($ok) {
+                return ['ok' => true, 'status' => $status, 'body' => (string)$body];
+            }
+            $detail = self::extractError((string)$body);
+            return [
+                'ok' => false,
+                'status' => $status,
+                'body' => (string)$body,
+                'error' => $detail ? ('plesk_error: ' . $detail) : 'plesk_error',
+            ];
         }
 
         $opts = [
@@ -87,16 +94,65 @@ final class PleskClient
             return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'http_request_failed'];
         }
         $ok = self::looksOk((string)$body);
-        return $ok
-            ? ['ok' => true, 'status' => 200, 'body' => (string)$body]
-            : ['ok' => false, 'status' => 200, 'body' => (string)$body, 'error' => 'plesk_error'];
+        if ($ok) {
+            return ['ok' => true, 'status' => 200, 'body' => (string)$body];
+        }
+        $detail = self::extractError((string)$body);
+        return [
+            'ok' => false,
+            'status' => 200,
+            'body' => (string)$body,
+            'error' => $detail ? ('plesk_error: ' . $detail) : 'plesk_error',
+        ];
     }
 
     private static function looksOk(string $body): bool
     {
         // Very lightweight checks: status ok and/or result ok
         if (stripos($body, '<status>ok</status>') !== false) return true;
+        if (stripos($body, '<status>error</status>') !== false) return false;
         if (stripos($body, 'result') !== false && stripos($body, 'ok') !== false && stripos($body, '<errtext>') === false) return true;
         return false;
+    }
+
+    private static function extractError(string $body): ?string
+    {
+        if ($body === '') return null;
+
+        // Try to parse Plesk XML response and extract errcode/errtext.
+        $prev = libxml_use_internal_errors(true);
+        try {
+            $xml = simplexml_load_string($body);
+            if ($xml === false) {
+                return null;
+            }
+
+            $errtext = null;
+            $errcode = null;
+
+            $texts = $xml->xpath('//errtext');
+            if (is_array($texts) && isset($texts[0])) {
+                $errtext = trim((string)$texts[0]);
+            }
+
+            $codes = $xml->xpath('//errcode');
+            if (is_array($codes) && isset($codes[0])) {
+                $errcode = trim((string)$codes[0]);
+            }
+
+            if ($errtext === '' && $errcode === '') {
+                return null;
+            }
+
+            if ($errtext !== '' && $errcode !== '') {
+                return $errtext . ' (code ' . $errcode . ')';
+            }
+            return $errtext !== '' ? $errtext : ('code ' . $errcode);
+        } catch (\Throwable $e) {
+            return null;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($prev);
+        }
     }
 }
