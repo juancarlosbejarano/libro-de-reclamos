@@ -7,6 +7,8 @@ use App\Support\Env;
 
 final class DomainVerifier
 {
+    private const DEFAULT_PLATFORM_IP = '207.58.173.84';
+
     /**
      * Verifies a custom domain is pointing to this platform.
      * Accepts either:
@@ -47,7 +49,9 @@ final class DomainVerifier
             if (in_array($cnameNorm, $allowedCnames, true)) {
                 return ['ok' => true, 'reason' => 'cname_ok', 'details' => ['cname' => $cnameNorm]];
             }
-            return ['ok' => false, 'reason' => 'cname_mismatch', 'details' => ['cname' => $cnameNorm, 'expected' => $allowedCnames]];
+            // Do not fail immediately: some DNS setups may expose a CNAME that doesn't match,
+            // while the A record still resolves to the correct hosting IP.
+            // Fall back to A record validation.
         }
 
         // 2) A record check
@@ -127,6 +131,9 @@ final class DomainVerifier
             $ips = array_map('trim', explode(',', $raw));
             return array_values(array_unique(array_filter($ips, fn($v) => is_string($v) && $v !== '')));
         }
-        return self::getARecords($baseDomain);
+        $ips = self::getARecords($baseDomain);
+        // If PLATFORM_ALLOWED_IPS is not set, allow the known platform IP used in the UI instructions.
+        $ips[] = self::DEFAULT_PLATFORM_IP;
+        return array_values(array_unique(array_filter($ips, fn($v) => is_string($v) && $v !== '')));
     }
 }
