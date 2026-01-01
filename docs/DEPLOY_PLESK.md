@@ -30,6 +30,50 @@ Verifica que exista:
 - `httpdocs/index.php`
 - `httpdocs/.htaccess`
 
+### Estructura correcta (recomendada)
+
+Lo ideal es que **solo** el contenido público quede dentro de `httpdocs/`.
+
+Estructura recomendada en Plesk (home del dominio):
+
+```text
+HOME/
+  app/
+  database/
+  docs/
+  lang/
+  scripts/
+  storage/
+  .env           (lo crea el instalador)
+  .env.example
+  README.md
+  httpdocs/
+   index.php
+   install.php
+   .htaccess
+   assets/
+   manifest.webmanifest
+   sw.js
+```
+
+### Si te quedó `httpdocs/httpdocs` (caso común)
+
+Si descomprimiste el ZIP **dentro** de `httpdocs/`, te puede quedar `httpdocs/httpdocs/install.php`.
+Eso provoca que `https://TU-DOMINIO/install.php` devuelva **File not found**.
+
+Cómo arreglarlo desde Plesk File Manager:
+
+1. Entra a `httpdocs/` (webroot actual).
+2. **Mueve al HOME** (directorio padre del dominio) estas carpetas/archivos si están dentro de `httpdocs/`:
+  - `app/`, `database/`, `docs/`, `lang/`, `scripts/`, `storage/`
+  - `README.md`, `.env.example` (y otros archivos no públicos)
+3. Entra a `httpdocs/httpdocs/` (la carpeta interna).
+4. Mueve su contenido al `httpdocs/` exterior:
+  - `.htaccess`, `index.php`, `install.php`, `assets/`, `manifest.webmanifest`, `sw.js`
+5. Elimina la carpeta `httpdocs/httpdocs/` cuando quede vacía.
+
+Tip: si existe `httpdocs/index.html`, renómbralo o elimínalo para que cargue `index.php`.
+
 ## 2) Crear base de datos
 
 En Plesk:
