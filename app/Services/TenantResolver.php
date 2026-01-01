@@ -35,15 +35,22 @@ final class TenantResolver
             // Still no tenant: keep a safe default for error messaging.
             $_SESSION['_tenant_id'] = 0;
             $_SESSION['_tenant_slug'] = 'unknown';
+            $_SESSION['_tenant_status'] = 'active';
             return;
         }
         $_SESSION['_tenant_id'] = (int)$tenant['id'];
         $_SESSION['_tenant_slug'] = (string)$tenant['slug'];
+        $_SESSION['_tenant_status'] = (string)($tenant['status'] ?? 'active');
     }
 
     public static function tenantId(): int
     {
         return (int)($_SESSION['_tenant_id'] ?? 0);
+    }
+
+    public static function tenantStatus(): string
+    {
+        return (string)($_SESSION['_tenant_status'] ?? 'active');
     }
 }
 

@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS tenants (
   id_type ENUM('ruc','dni') NULL,
   id_number VARCHAR(16) NULL,
   address_full VARCHAR(255) NULL,
+  status ENUM('active','suspended') NOT NULL DEFAULT 'active',
+  suspended_at DATETIME NULL,
+  logo_path VARCHAR(255) NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_tenants_slug (slug)

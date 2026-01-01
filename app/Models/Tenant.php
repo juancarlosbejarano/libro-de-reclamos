@@ -25,6 +25,16 @@ final class Tenant
         return is_array($row) ? $row : null;
     }
 
+    /** @return array<string,mixed>|null */
+    public static function findById(int $id): ?array
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('SELECT * FROM tenants WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
     public static function slugExists(string $slug): bool
     {
         $pdo = DB::pdo();
@@ -45,6 +55,32 @@ final class Tenant
             'address_full' => $addressFull,
         ]);
         return (int)$pdo->lastInsertId();
+    }
+
+    public static function updateDetails(int $id, string $name, ?string $addressFull, ?string $logoPath): void
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('UPDATE tenants SET name = :name, address_full = :address_full, logo_path = :logo_path WHERE id = :id');
+        $stmt->execute([
+            'id' => $id,
+            'name' => $name,
+            'address_full' => $addressFull,
+            'logo_path' => $logoPath,
+        ]);
+    }
+
+    public static function suspend(int $id): void
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('UPDATE tenants SET status = "suspended", suspended_at = NOW() WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
+    public static function reactivate(int $id): void
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('UPDATE tenants SET status = "active", suspended_at = NULL WHERE id = :id');
+        $stmt->execute(['id' => $id]);
     }
 }
 

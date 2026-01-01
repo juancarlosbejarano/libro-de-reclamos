@@ -92,6 +92,8 @@ return [
   'complaints.whatsapp' => 'WhatsApp',
   'errors.404' => 'Página no encontrada',
   'errors.path' => 'Ruta: {path}',
+  'errors.suspended_title' => 'Servicio suspendido',
+  'errors.suspended_message' => 'Esta empresa está suspendida. Contacta al administrador de la plataforma.',
 
   'platform.title' => 'Administración Plataforma',
   'platform.login' => 'Ingresar (Plataforma)',
@@ -121,5 +123,13 @@ return [
   'platform.not_configured' => 'No configurado',
   'platform.saved' => 'Guardado',
   'platform.error' => 'Error',
+  'platform.actions' => 'Acciones',
+  'platform.edit' => 'Editar',
+  'platform.save' => 'Guardar',
+  'platform.status_active' => 'Activo',
+  'platform.status_suspended' => 'Suspendido',
+  'platform.suspend' => 'Suspender',
+  'platform.reactivate' => 'Reactivar',
+  'platform.logo' => 'Logo',
 ];
 

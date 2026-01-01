@@ -27,7 +27,7 @@ final class PlatformTenantsController
         if ($guard) return $guard;
 
         $pdo = DB::pdo();
-        $sql = 'SELECT t.id, t.slug, t.name, t.created_at,
+        $sql = 'SELECT t.id, t.slug, t.name, t.status, t.created_at,
                        (SELECT COUNT(*) FROM complaints c WHERE c.tenant_id = t.id) AS complaints_count,
                        (SELECT COUNT(*) FROM tenant_domains d WHERE d.tenant_id = t.id) AS domains_count,
                        (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND u.role = "admin") AS admins_count
@@ -164,5 +164,101 @@ final class PlatformTenantsController
             $pdo->rollBack();
             return Response::html(View::render('platform/tenant_create', ['error' => 'No se pudo crear: ' . $e->getMessage(), 'form' => $form]), 500);
         }
+    }
+
+    public function edit(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+
+        $id = (int)($params['id'] ?? 0);
+        $tenant = $id > 0 ? Tenant::findById($id) : null;
+        if (!$tenant) {
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+        }
+
+        return Response::html(View::render('platform/tenant_edit', [
+            'tenant' => $tenant,
+            'saved' => $request->query['saved'] ?? null,
+            'error' => $request->query['error'] ?? null,
+        ]));
+    }
+
+    public function update(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+
+        $id = (int)($params['id'] ?? 0);
+        $tenant = $id > 0 ? Tenant::findById($id) : null;
+        if (!$tenant) return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants/' . $id . '/edit?error=csrf');
+        }
+
+        $name = trim((string)($request->post['name'] ?? ''));
+        $addressFull = trim((string)($request->post['address_full'] ?? ''));
+        if ($name === '') {
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'error' => 'Completa el nombre']), 422);
+        }
+
+        $logoPath = (string)($tenant['logo_path'] ?? '');
+        $logo = $request->files['logo'] ?? null;
+        if (is_array($logo) && isset($logo['tmp_name']) && is_uploaded_file((string)$logo['tmp_name'])) {
+            $original = strtolower((string)($logo['name'] ?? 'logo'));
+            $ext = pathinfo($original, PATHINFO_EXTENSION);
+            $ext = is_string($ext) ? strtolower($ext) : '';
+            if (!in_array($ext, ['png', 'jpg', 'jpeg', 'webp'], true)) {
+                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'error' => 'Formato de logo inválido (usa PNG/JPG/WebP)']), 422);
+            }
+            if (!@getimagesize((string)$logo['tmp_name'])) {
+                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'error' => 'El archivo no parece una imagen válida']), 422);
+            }
+
+            $base = realpath(__DIR__ . '/../../../') ?: (__DIR__ . '/../../../');
+            $dir = $base . '/httpdocs/uploads/tenants/' . $id;
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+            foreach (glob($dir . '/logo.*') ?: [] as $old) {
+                @unlink($old);
+            }
+            $filename = 'logo.' . ($ext === 'jpeg' ? 'jpg' : $ext);
+            $dest = $dir . '/' . $filename;
+            @move_uploaded_file((string)$logo['tmp_name'], $dest);
+            $logoPath = '/uploads/tenants/' . $id . '/' . $filename;
+        }
+
+        Tenant::updateDetails($id, $name, $addressFull !== '' ? $addressFull : null, $logoPath !== '' ? $logoPath : null);
+        return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+    }
+
+    public function suspend(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants');
+        }
+        $id = (int)($params['id'] ?? 0);
+        if ($id > 0) {
+            Tenant::suspend($id);
+        }
+        return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+    }
+
+    public function reactivate(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants');
+        }
+        $id = (int)($params['id'] ?? 0);
+        if ($id > 0) {
+            Tenant::reactivate($id);
+        }
+        return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
     }
 }

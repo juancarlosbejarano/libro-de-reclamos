@@ -40,6 +40,14 @@ final class Kernel
         TenantResolver::resolveFromHost($request->host);
         I18n::bootstrap($request);
 
+        // Enforce tenant suspension (do not block platform routes).
+        if (TenantResolver::tenantStatus() === 'suspended') {
+            $p = $request->path;
+            if ($p !== '/health' && !str_starts_with($p, '/platform')) {
+                return Response::html(View::render('errors/suspended'), 403);
+            }
+        }
+
         // PWA headers
         if ($request->path === '/' || str_starts_with($request->path, '/complaints')) {
             // no-op
@@ -66,6 +74,10 @@ final class Kernel
         $this->router->add('GET', '#^/platform/tenants$#', [new PlatformTenantsController(), 'index']);
         $this->router->add('GET', '#^/platform/tenants/create$#', [new PlatformTenantsController(), 'create']);
         $this->router->add('POST', '#^/platform/tenants/create$#', [new PlatformTenantsController(), 'store']);
+        $this->router->add('GET', '#^/platform/tenants/(?P<id>\d+)/edit$#', [new PlatformTenantsController(), 'edit']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/edit$#', [new PlatformTenantsController(), 'update']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/suspend$#', [new PlatformTenantsController(), 'suspend']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/reactivate$#', [new PlatformTenantsController(), 'reactivate']);
         $this->router->add('GET', '#^/platform/jobs$#', [new PlatformJobsController(), 'index']);
         $this->router->add('GET', '#^/platform/reports$#', [new PlatformReportsController(), 'index']);
 

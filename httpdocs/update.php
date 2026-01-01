@@ -92,6 +92,24 @@ $migrations[] = [
   },
 ];
 
+// Migration: tenants.status/suspended_at/logo_path for platform administration
+$migrations[] = [
+  'id' => '2026_01_01_tenants_admin_fields',
+  'label' => 'Add tenants.status, tenants.suspended_at, tenants.logo_path',
+  'needed' => !(columnExists($pdo, 'tenants', 'status') && columnExists($pdo, 'tenants', 'suspended_at') && columnExists($pdo, 'tenants', 'logo_path')),
+  'run' => function () use ($pdo): void {
+    if (!columnExists($pdo, 'tenants', 'status')) {
+      $pdo->exec("ALTER TABLE tenants ADD COLUMN status ENUM('active','suspended') NOT NULL DEFAULT 'active'");
+    }
+    if (!columnExists($pdo, 'tenants', 'suspended_at')) {
+      $pdo->exec("ALTER TABLE tenants ADD COLUMN suspended_at DATETIME NULL");
+    }
+    if (!columnExists($pdo, 'tenants', 'logo_path')) {
+      $pdo->exec("ALTER TABLE tenants ADD COLUMN logo_path VARCHAR(255) NULL");
+    }
+  },
+];
+
 $needsAny = false;
 foreach ($migrations as $m) {
     if (!empty($m['needed'])) { $needsAny = true; break; }
@@ -116,7 +134,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $migrations[0]['needed'] = !tableExists($pdo, 'system_kv');
             $migrations[1]['needed'] = !(columnExists($pdo, 'tenants', 'id_type') && columnExists($pdo, 'tenants', 'id_number'));
             $migrations[2]['needed'] = !columnExists($pdo, 'tenants', 'address_full');
-            $needsAny = ($migrations[0]['needed'] || $migrations[1]['needed'] || $migrations[2]['needed']);
+            $migrations[3]['needed'] = !(columnExists($pdo, 'tenants', 'status') && columnExists($pdo, 'tenants', 'suspended_at') && columnExists($pdo, 'tenants', 'logo_path'));
+            $needsAny = ($migrations[0]['needed'] || $migrations[1]['needed'] || $migrations[2]['needed'] || $migrations[3]['needed']);
         } catch (Throwable $e) {
             http_response_code(500);
             $error = 'Update failed: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
