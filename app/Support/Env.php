@@ -8,6 +8,8 @@ final class Env
     /** @var array<string,string> */
     private static array $values = [];
 
+    private static ?string $loadedPath = null;
+
     public static function load(string $path): void
     {
         if (!is_file($path)) {
@@ -22,11 +24,18 @@ final class Env
             if ($line === '' || str_starts_with($line, '#')) {
                 continue;
             }
+
+            // Allow shell-style env files.
+            if (str_starts_with($line, 'export ')) {
+                $line = trim(substr($line, 7));
+            }
             $pos = strpos($line, '=');
             if ($pos === false) {
                 continue;
             }
             $key = trim(substr($line, 0, $pos));
+            // Handle UTF-8 BOM in the first key.
+            $key = ltrim($key, "\xEF\xBB\xBF");
             $value = trim(substr($line, $pos + 1));
             $value = self::stripQuotes($value);
             self::$values[$key] = $value;
@@ -34,6 +43,13 @@ final class Env
                 putenv($key . '=' . $value);
             }
         }
+
+        self::$loadedPath = $path;
+    }
+
+    public static function loadedPath(): ?string
+    {
+        return self::$loadedPath;
     }
 
     public static function get(string $key, ?string $default = null): ?string

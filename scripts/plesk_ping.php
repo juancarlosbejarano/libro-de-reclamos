@@ -66,6 +66,7 @@ requireOwnerIfWeb();
 $url = (string)(Env::get('PLESK_API_URL', '') ?? '');
 $key = (string)(Env::get('PLESK_API_KEY', '') ?? '');
 $verifyTls = Env::bool('PLESK_VERIFY_TLS', true);
+$loadedEnv = Env::loadedPath();
 
 if ($url === '' || $key === '') {
     if (!isCli()) {
@@ -73,6 +74,7 @@ if ($url === '' || $key === '') {
         renderWebHeader('Plesk ping');
         echo '<h1>Plesk ping</h1>';
         echo '<p class="error">Falta configurar PLESK_API_URL o PLESK_API_KEY.</p>';
+        echo '<p class="muted">.env cargado desde: <strong>' . htmlspecialchars($loadedEnv ?: '(no encontrado)', ENT_QUOTES, 'UTF-8') . '</strong></p>';
         echo '<div class="card"><p class="muted">Configura estas variables en tu <strong>.env</strong>:</p>'
             . '<pre style="margin:0">PLESK_API_URL="https://127.0.0.1:8443/enterprise/control/agent.php"\nPLESK_API_KEY="TU_API_KEY"\nPLESK_VERIFY_TLS=true</pre>'
             . '<p class="muted" style="margin-top:12px">Nota: si tu Plesk usa certificado self-signed, puedes poner <strong>PLESK_VERIFY_TLS=false</strong>.</p>'
@@ -81,6 +83,7 @@ if ($url === '' || $key === '') {
         exit(1);
     }
     outLn("Missing PLESK_API_URL or PLESK_API_KEY");
+    outLn(".env loaded from: " . ($loadedEnv ?: '(not found)'));
     outLn("Set them in .env, e.g.");
     outLn("  PLESK_API_URL=\"https://127.0.0.1:8443/enterprise/control/agent.php\"");
     outLn("  PLESK_API_KEY=\"...\"");
