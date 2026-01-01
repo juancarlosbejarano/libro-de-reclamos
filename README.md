@@ -274,6 +274,10 @@ En el formulario puedes ingresar **RUC** o **DNI** y presionar **Consultar** par
 
 > Nota: requiere `APP_KEY` válido para cifrar el token.
 
+Si en tu hosting la consulta falla por certificado/SSL (CA desactualizada), puedes habilitar el fallback inseguro:
+
+- En `.env`: `ARCA_API_INSECURE_SSL=true`
+
 ### Nota si ya tienes BD creada (migración)
 
 Si tu base ya existe y no quieres re-importar `database/schema.sql`, aplica:

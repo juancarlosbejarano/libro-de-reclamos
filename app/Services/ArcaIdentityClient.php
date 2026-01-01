@@ -5,11 +5,12 @@ namespace App\Services;
 
 use App\Models\SystemKV;
 use App\Support\Crypto;
+use App\Support\Env;
 
 final class ArcaIdentityClient
 {
     /** @return array{ok:bool,status:int,error?:string,json?:array<string,mixed>} */
-    private static function getJson(string $url): array
+    private static function getJson(string $url, bool $insecureSsl = false): array
     {
         if (!function_exists('curl_init')) {
             return ['ok' => false, 'status' => 0, 'error' => 'curl_required'];
@@ -20,14 +21,22 @@ final class ArcaIdentityClient
             return ['ok' => false, 'status' => 0, 'error' => 'curl_init_failed'];
         }
 
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => 'GET',
             CURLOPT_HTTPHEADER => [
                 'Accept: application/json',
             ],
             CURLOPT_TIMEOUT => 20,
-        ]);
+        ];
+
+        if ($insecureSsl) {
+            // WARNING: insecure; use only when the hosting is missing CA bundles.
+            $opts[CURLOPT_SSL_VERIFYPEER] = false;
+            $opts[CURLOPT_SSL_VERIFYHOST] = 0;
+        }
+
+        curl_setopt_array($ch, $opts);
 
         $body = curl_exec($ch);
         $err = curl_error($ch);
@@ -80,7 +89,16 @@ final class ArcaIdentityClient
         $token = self::token();
         $url = 'https://api.arca.digital/api/' . $kind . '/' . rawurlencode($digits) . '?api_token=' . rawurlencode($token);
 
-        $res = self::getJson($url);
+        $allowInsecure = Env::bool('ARCA_API_INSECURE_SSL', false);
+
+        $res = self::getJson($url, $allowInsecure);
+        if (!$res['ok'] && !$allowInsecure) {
+            $err = (string)($res['error'] ?? '');
+            // Some hostings fail TLS validation due to missing CA bundle.
+            if (stripos($err, 'SSL') !== false || stripos($err, 'certificate') !== false) {
+                $res = self::getJson($url, true);
+            }
+        }
         if (!$res['ok']) {
             return ['ok' => false, 'error' => $res['error'] ?? 'lookup_failed', 'raw' => $res['json'] ?? null];
         }
