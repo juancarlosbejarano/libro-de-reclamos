@@ -80,6 +80,18 @@ $migrations[] = [
     },
 ];
 
+// Migration: tenants.address_full for RUC address storage
+$migrations[] = [
+  'id' => '2026_01_01_tenants_address_full',
+  'label' => 'Add tenants.address_full',
+  'needed' => !columnExists($pdo, 'tenants', 'address_full'),
+  'run' => function () use ($pdo): void {
+    if (!columnExists($pdo, 'tenants', 'address_full')) {
+      $pdo->exec("ALTER TABLE tenants ADD COLUMN address_full VARCHAR(255) NULL");
+    }
+  },
+];
+
 $needsAny = false;
 foreach ($migrations as $m) {
     if (!empty($m['needed'])) { $needsAny = true; break; }
@@ -103,7 +115,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Recompute needed flags after running
             $migrations[0]['needed'] = !tableExists($pdo, 'system_kv');
             $migrations[1]['needed'] = !(columnExists($pdo, 'tenants', 'id_type') && columnExists($pdo, 'tenants', 'id_number'));
-            $needsAny = ($migrations[0]['needed'] || $migrations[1]['needed']);
+            $migrations[2]['needed'] = !columnExists($pdo, 'tenants', 'address_full');
+            $needsAny = ($migrations[0]['needed'] || $migrations[1]['needed'] || $migrations[2]['needed']);
         } catch (Throwable $e) {
             http_response_code(500);
             $error = 'Update failed: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');

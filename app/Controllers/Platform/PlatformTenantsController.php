@@ -62,12 +62,14 @@ final class PlatformTenantsController
         $idNumberRaw = (string)($request->post['id_number'] ?? '');
         $idNumber = preg_replace('/\D+/', '', $idNumberRaw) ?? '';
         $name = trim((string)($request->post['name'] ?? ''));
+        $addressFull = trim((string)($request->post['address_full'] ?? ''));
         $slug = strtolower(trim((string)($request->post['slug'] ?? '')));
 
         $form = [
             'id_type' => $idType,
             'id_number' => $idNumber,
             'name' => $name,
+            'address_full' => $addressFull,
             'slug' => $slug,
         ];
 
@@ -75,12 +77,21 @@ final class PlatformTenantsController
             try {
                 $res = ArcaIdentityClient::lookup($idType === 'dni' ? 'dni' : 'ruc', $idNumber);
                 if (!$res['ok']) {
+                    $detail = '';
+                    if (($res['error'] ?? null) === 'unexpected_response' && isset($res['raw']) && is_array($res['raw'])) {
+                        $keys = array_keys($res['raw']);
+                        $keys = array_slice($keys, 0, 12);
+                        $detail = ' (keys: ' . implode(', ', array_map('strval', $keys)) . ')';
+                    }
                     return Response::html(View::render('platform/tenant_create', [
-                        'error' => 'No se pudo consultar: ' . ($res['error'] ?? 'error'),
+                        'error' => 'No se pudo consultar: ' . ($res['error'] ?? 'error') . $detail,
                         'form' => $form,
                     ]), 422);
                 }
                 $form['name'] = (string)($res['name'] ?? '');
+                if (isset($res['address_full']) && is_string($res['address_full'])) {
+                    $form['address_full'] = $res['address_full'];
+                }
                 return Response::html(View::render('platform/tenant_create', ['form' => $form]));
             } catch (\Throwable $e) {
                 return Response::html(View::render('platform/tenant_create', [
@@ -113,7 +124,13 @@ final class PlatformTenantsController
         $pdo = DB::pdo();
         $pdo->beginTransaction();
         try {
-            $tenantId = Tenant::create($slug, $name, in_array($idType, ['ruc', 'dni'], true) ? $idType : null, $idNumber !== '' ? $idNumber : null);
+            $tenantId = Tenant::create(
+                $slug,
+                $name,
+                in_array($idType, ['ruc', 'dni'], true) ? $idType : null,
+                $idNumber !== '' ? $idNumber : null,
+                $addressFull !== '' ? $addressFull : null
+            );
 
             $stmt = $pdo->prepare('INSERT INTO tenant_domains (tenant_id, domain, kind, is_primary, verified_at, created_at) VALUES (:tid, :domain, :kind, 1, NOW(), NOW())');
             $stmt->execute(['tid' => $tenantId, 'domain' => $subdomain, 'kind' => 'subdomain']);

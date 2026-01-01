@@ -35,6 +35,9 @@ ob_start();
   <label><?= htmlspecialchars($t('auth.company')) ?></label>
   <input name="name" maxlength="180" value="<?= htmlspecialchars((string)($form['name'] ?? '')) ?>" />
 
+  <label><?= htmlspecialchars($t('platform.address_full')) ?></label>
+  <input name="address_full" maxlength="255" value="<?= htmlspecialchars((string)($form['address_full'] ?? '')) ?>" />
+
   <label><?= htmlspecialchars($t('auth.subdomain')) ?></label>
   <input name="slug" maxlength="64" value="<?= htmlspecialchars((string)($form['slug'] ?? '')) ?>" placeholder="miempresa" />
 

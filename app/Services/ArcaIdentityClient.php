@@ -9,6 +9,38 @@ use App\Support\Env;
 
 final class ArcaIdentityClient
 {
+    /**
+     * @param array<string,mixed> $data
+     * @param string[] $keys
+     */
+    private static function findFirstStringByKeys(array $data, array $keys, int $depth = 0): ?string
+    {
+        if ($depth > 4) return null;
+
+        foreach ($keys as $k) {
+            if (!array_key_exists($k, $data)) continue;
+            $v = $data[$k];
+            if (is_string($v)) {
+                $v = trim($v);
+                if ($v !== '') return $v;
+            }
+            if (is_array($v)) {
+                $found = self::findFirstStringByKeys($v, $keys, $depth + 1);
+                if ($found !== null) return $found;
+            }
+        }
+
+        // Fallback: scan nested arrays
+        foreach ($data as $v) {
+            if (is_array($v)) {
+                $found = self::findFirstStringByKeys($v, $keys, $depth + 1);
+                if ($found !== null) return $found;
+            }
+        }
+
+        return null;
+    }
+
     /** @return array{ok:bool,status:int,error?:string,json?:array<string,mixed>} */
     private static function getJson(string $url, bool $insecureSsl = false): array
     {
@@ -78,7 +110,7 @@ final class ArcaIdentityClient
 
     /**
      * @param 'ruc'|'dni' $kind
-     * @return array{ok:bool,name?:string,error?:string,raw?:array<string,mixed>}
+        * @return array{ok:bool,name?:string,address_full?:string,error?:string,raw?:array<string,mixed>}
      */
     public static function lookup(string $kind, string $number): array
     {
@@ -113,9 +145,27 @@ final class ArcaIdentityClient
         }
 
         $json = $res['json'] ?? [];
+
+        // Some APIs return 200 with an error payload.
+        if (isset($json['success']) && $json['success'] === false) {
+            $msg = is_string($json['message'] ?? null) ? (string)$json['message'] : 'api_error';
+            return ['ok' => false, 'error' => $msg, 'raw' => $json];
+        }
+        if (isset($json['ok']) && $json['ok'] === false) {
+            $msg = is_string($json['message'] ?? null) ? (string)$json['message'] : 'api_error';
+            return ['ok' => false, 'error' => $msg, 'raw' => $json];
+        }
+        if (isset($json['error']) && is_string($json['error']) && trim($json['error']) !== '') {
+            return ['ok' => false, 'error' => (string)$json['error'], 'raw' => $json];
+        }
+
         $data = $json;
         if (isset($json['data']) && is_array($json['data'])) {
             $data = $json['data'];
+        }
+        // If data is a list, use the first element.
+        if (is_array($data) && isset($data[0]) && is_array($data[0])) {
+            $data = $data[0];
         }
 
         $name = self::extractName($kind, $data);
@@ -123,52 +173,84 @@ final class ArcaIdentityClient
             $name = self::extractName($kind, $json['result']);
         }
 
+        $addressFull = null;
+        if ($kind === 'ruc') {
+            $addressFull = self::extractAddressFull($data);
+            if ($addressFull === null && isset($json['result']) && is_array($json['result'])) {
+                $addressFull = self::extractAddressFull($json['result']);
+            }
+        }
+
         if ($name === null) {
             return ['ok' => false, 'error' => 'unexpected_response', 'raw' => $json];
         }
 
-        return ['ok' => true, 'name' => $name, 'raw' => $json];
+        $out = ['ok' => true, 'name' => $name, 'raw' => $json];
+        if (is_string($addressFull) && trim($addressFull) !== '') {
+            $out['address_full'] = $addressFull;
+        }
+        return $out;
+    }
+
+    /** @param array<string,mixed> $data */
+    private static function extractAddressFull(array $data): ?string
+    {
+        $keys = [
+            'direccion_completa',
+            'direccionCompleta',
+            'direccion',
+            'address_full',
+            'addressFull',
+            'address',
+        ];
+        return self::findFirstStringByKeys($data, $keys);
     }
 
     /** @param array<string,mixed> $data */
     private static function extractName(string $kind, array $data): ?string
     {
-        $candidates = [];
-
         if ($kind === 'ruc') {
-            $candidates = [
-                $data['razon_social'] ?? null,
-                $data['nombre_o_razon_social'] ?? null,
-                $data['nombre'] ?? null,
-                $data['business_name'] ?? null,
+            $keys = [
+                'razon_social',
+                'razonSocial',
+                'razonSocialSunat',
+                'nombre_o_razon_social',
+                'nombreORazonSocial',
+                'nombre_razon_social',
+                'nombre',
+                'name',
+                'business_name',
+                'businessName',
+                'denominacion',
+                'empresa',
+                'company',
+                'rznSocial',
             ];
-        } else {
-            $candidates = [
-                $data['nombre_completo'] ?? null,
-                $data['nombre'] ?? null,
-                $data['full_name'] ?? null,
-            ];
-
-            $nombres = $data['nombres'] ?? null;
-            $ap = $data['apellido_paterno'] ?? null;
-            $am = $data['apellido_materno'] ?? null;
-            if (is_string($nombres) || is_string($ap) || is_string($am)) {
-                $parts = [];
-                if (is_string($nombres) && trim($nombres) !== '') $parts[] = trim($nombres);
-                if (is_string($ap) && trim($ap) !== '') $parts[] = trim($ap);
-                if (is_string($am) && trim($am) !== '') $parts[] = trim($am);
-                if ($parts) {
-                    $candidates[] = implode(' ', $parts);
-                }
-            }
+            return self::findFirstStringByKeys($data, $keys);
         }
 
-        foreach ($candidates as $c) {
-            if (is_string($c)) {
-                $c = trim($c);
-                if ($c !== '') return $c;
-            }
+        $keys = [
+            'nombre_completo',
+            'nombreCompleto',
+            'full_name',
+            'fullName',
+            'nombre',
+            'name',
+        ];
+        $direct = self::findFirstStringByKeys($data, $keys);
+        if ($direct !== null) return $direct;
+
+        $nombres = $data['nombres'] ?? ($data['first_names'] ?? null);
+        $ap = $data['apellido_paterno'] ?? ($data['apellidoPaterno'] ?? null);
+        $am = $data['apellido_materno'] ?? ($data['apellidoMaterno'] ?? null);
+        if (is_string($nombres) || is_string($ap) || is_string($am)) {
+            $parts = [];
+            if (is_string($nombres) && trim($nombres) !== '') $parts[] = trim($nombres);
+            if (is_string($ap) && trim($ap) !== '') $parts[] = trim($ap);
+            if (is_string($am) && trim($am) !== '') $parts[] = trim($am);
+            if ($parts) return implode(' ', $parts);
         }
+
         return null;
     }
 }
