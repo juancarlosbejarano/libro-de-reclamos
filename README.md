@@ -280,6 +280,7 @@ Para instalar en hosting:
 4. Completa credenciales de BD + datos de plataforma.
 5. Al finalizar, elimina `httpdocs/install.php` del servidor por seguridad.
 
+Guía detallada de despliegue: `docs/DEPLOY_PLESK.md`
 
 
 ## API (ejemplos)
