@@ -74,6 +74,17 @@ Cómo arreglarlo desde Plesk File Manager:
 
 Tip: si existe `httpdocs/index.html`, renómbralo o elimínalo para que cargue `index.php`.
 
+### Nota sobre `storage/` dentro de `httpdocs/`
+
+Por seguridad, se recomienda que `storage/` esté fuera del webroot.
+Sin embargo, si tu hosting ya lo maneja dentro de `httpdocs/storage/`, el instalador lo detecta y lo usará.
+
+En ese caso, la variable `.env` relevante es:
+
+- `UPLOADS_DIR="httpdocs/storage/uploads"`
+
+(Así el backend guarda adjuntos en la ruta correcta desde la raíz del proyecto.)
+
 ## 2) Crear base de datos
 
 En Plesk:

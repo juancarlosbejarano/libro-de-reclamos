@@ -5,7 +5,16 @@ declare(strict_types=1);
 // After successful install, this creates storage/install.lock. Delete this file after installing.
 
 $rootDir = dirname(__DIR__);
-$lockFile = $rootDir . '/storage/install.lock';
+
+// Storage can live either in project root (recommended) or inside httpdocs (common in some Plesk setups).
+// If httpdocs/storage exists, we use it.
+$storageDir = $rootDir . '/storage';
+$httpdocsStorage = __DIR__ . '/storage';
+if (is_dir($httpdocsStorage)) {
+    $storageDir = $httpdocsStorage;
+}
+
+$lockFile = rtrim($storageDir, '/\\') . '/install.lock';
 $envFile = $rootDir . '/.env';
 $schemaFile = $rootDir . '/database/schema.sql';
 
@@ -206,15 +215,15 @@ function ensureDir(string $path): void
 }
 
 /** @return array<string,bool> */
-function computeWritableChecks(string $rootDir, string $envFile): array
+function computeWritableChecks(string $rootDir, string $envFile, string $storageDir): array
 {
-    ensureDir($rootDir . '/storage');
-    ensureDir($rootDir . '/storage/uploads');
+    ensureDir($storageDir);
+    ensureDir(rtrim($storageDir, '/\\') . '/uploads');
 
     return [
         $envFile => (is_file($envFile) ? is_writable($envFile) : is_writable($rootDir)),
-        $rootDir . '/storage' => (is_dir($rootDir . '/storage') && is_writable($rootDir . '/storage')),
-        $rootDir . '/storage/uploads' => (is_dir($rootDir . '/storage/uploads') && is_writable($rootDir . '/storage/uploads')),
+        $storageDir => (is_dir($storageDir) && is_writable($storageDir)),
+        rtrim($storageDir, '/\\') . '/uploads' => (is_dir(rtrim($storageDir, '/\\') . '/uploads') && is_writable(rtrim($storageDir, '/\\') . '/uploads')),
     ];
 }
 
@@ -242,7 +251,7 @@ $requirements = [
     'ext-curl (recomendado para Plesk/Chatwoot)' => extension_loaded('curl'),
 ];
 
-$writableChecks = computeWritableChecks($rootDir, $envFile);
+$writableChecks = computeWritableChecks($rootDir, $envFile, $storageDir);
 
 // --- UI -------------------------------------------------------------------
 
@@ -267,8 +276,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     }
     $reqHtml .= '</ul>';
     if (in_array(false, array_values($writableChecks), true)) {
-        $reqHtml .= '<p class="muted">Si ves NO ESCRIBIBLE, en Plesk ajusta permisos/propietario de <code>storage/</code> y <code>storage/uploads/</code> (p.ej. 775) o usa la opción de Plesk para “Fix Permissions”.</p>';
+        $reqHtml .= '<p class="muted">Si ves NO ESCRIBIBLE, en Plesk ajusta permisos/propietario del directorio <code>storage</code> y <code>storage/uploads</code> (p.ej. 775) o usa la opción de Plesk para “Fix Permissions”.</p>';
     }
+    $reqHtml .= '<p class="muted">Storage detectado en: <code>' . h(str_replace('\\', '/', $storageDir)) . '</code></p>';
     $reqHtml .= '</div>';
 
     $reqHtml .= '<form method="post" class="card" style="margin-top:12px">';
@@ -322,7 +332,7 @@ $data = postData();
 $errors = [];
 
 // Re-check permissions (and attempt to fix) on POST as well.
-$writableChecks = computeWritableChecks($rootDir, $envFile);
+$writableChecks = computeWritableChecks($rootDir, $envFile, $storageDir);
 
 foreach ($requirements as $label => $ok) {
     if (!$ok) $errors[] = 'Falta requisito: ' . $label;
@@ -455,7 +465,12 @@ try {
     $lines[] = 'PLESK_API_KEY=' . envQuote($pleskApiKey);
     $lines[] = 'PLESK_VERIFY_TLS="' . ($pleskVerifyTls ? '1' : '0') . '"';
     $lines[] = '';
-    $lines[] = 'UPLOADS_DIR="storage/uploads"';
+    // If storage lives under httpdocs, uploads must be referenced from project root.
+    $uploadsDir = 'storage/uploads';
+    if (realpath($storageDir) && realpath($storageDir) === realpath(__DIR__ . '/storage')) {
+        $uploadsDir = 'httpdocs/storage/uploads';
+    }
+    $lines[] = 'UPLOADS_DIR=' . envQuote($uploadsDir);
 
     $envContent = implode("\n", $lines) . "\n";
     if (file_put_contents($envFile, $envContent) === false) {
