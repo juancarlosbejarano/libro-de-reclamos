@@ -66,12 +66,20 @@ function requireOwnerIfWeb(): void
 
 requireOwnerIfWeb();
 
+$loadedEnv = Env::loadedPath();
+
+if (!isCli()) {
+    renderWebHeader('Plesk provision');
+    echo '<h1>Plesk provision</h1>';
+    echo '<p class="muted">PHP: <strong>' . htmlspecialchars(PHP_VERSION, ENT_QUOTES, 'UTF-8') . '</strong></p>';
+    echo '<p class="muted">.env cargado desde: <strong>' . htmlspecialchars($loadedEnv ?: '(no encontrado)', ENT_QUOTES, 'UTF-8') . '</strong></p>';
+}
+
 $auto = Env::bool('PLESK_AUTO_PROVISION', true);
 if (!$auto) {
     if (!isCli()) {
         http_response_code(200);
-        renderWebHeader('Plesk provision');
-        echo '<h1>Plesk provision</h1><p class="muted">PLESK_AUTO_PROVISION está desactivado.</p>';
+        echo '<p class="muted">PLESK_AUTO_PROVISION está desactivado.</p>';
         renderWebFooter();
         exit(0);
     }
@@ -88,14 +96,10 @@ if ($site === '') {
     }
 }
 
-$loadedEnv = Env::loadedPath();
 if ($site === '') {
     if (!isCli()) {
         http_response_code(500);
-        renderWebHeader('Plesk provision');
-        echo '<h1>Plesk provision</h1>';
         echo '<p class="error">Falta configurar PLESK_SITE_NAME.</p>';
-        echo '<p class="muted">.env cargado desde: <strong>' . htmlspecialchars($loadedEnv ?: '(no encontrado)', ENT_QUOTES, 'UTF-8') . '</strong></p>';
         echo '<div class="card"><p class="muted">Opciones:</p>'
             . '<ol style="margin:0 0 0 18px">'
             . '<li>Define <strong>PLESK_SITE_NAME</strong> en tu <strong>.env</strong> (recomendado).</li>'
@@ -111,12 +115,53 @@ if ($site === '') {
     exit(1);
 }
 
+// Manual one-off provisioning (debug): provide domain to create alias immediately.
+$manualDomain = '';
+if (isCli()) {
+    $manualDomain = (string)($argv[2] ?? '');
+} else {
+    $manualDomain = (string)($_GET['domain'] ?? '');
+}
+if (trim($manualDomain) !== '') {
+    $manualDomain = trim($manualDomain);
+    if (!isCli()) {
+        echo '<p class="muted">Site: <strong>' . htmlspecialchars($site, ENT_QUOTES, 'UTF-8') . '</strong></p>';
+        echo '<p class="muted">Domain: <strong>' . htmlspecialchars($manualDomain, ENT_QUOTES, 'UTF-8') . '</strong></p>';
+    } else {
+        outLn('Site: ' . $site);
+        outLn('Domain: ' . $manualDomain);
+    }
+
+    $res = PleskClient::createDomainAlias($site, $manualDomain);
+    if ($res['ok']) {
+        outLn('OK alias created');
+        if (!isCli()) {
+            renderWebFooter();
+        }
+        exit(0);
+    }
+    $err = ($res['error'] ?? 'unknown') . ' (http ' . (string)$res['status'] . ')';
+    outLn('FAIL: ' . $err);
+    $body = (string)($res['body'] ?? '');
+    $body = trim($body);
+    if ($body !== '') {
+        $bodyOneLine = preg_replace('~\s+~', ' ', $body);
+        $bodyOneLine = trim((string)$bodyOneLine);
+        if (strlen($bodyOneLine) > 900) {
+            $bodyOneLine = substr($bodyOneLine, 0, 900) . '…';
+        }
+        outLn('Response snippet: ' . $bodyOneLine);
+    }
+    if (!isCli()) {
+        renderWebFooter();
+    }
+    exit(1);
+}
+
 $jobs = DomainProvisioningJob::listPending(25);
 if (!$jobs) {
     if (!isCli()) {
         http_response_code(200);
-        renderWebHeader('Plesk provision');
-        echo '<h1>Plesk provision</h1>';
         echo '<p class="muted">Site: <strong>' . htmlspecialchars($site, ENT_QUOTES, 'UTF-8') . '</strong></p>';
         echo '<p class="muted">No hay jobs pendientes.</p>';
         renderWebFooter();
@@ -165,6 +210,10 @@ foreach ($jobs as $job) {
         }
         outLn('Response snippet: ' . $bodyOneLine);
     }
+}
+
+if (!isCli()) {
+    renderWebFooter();
 }
 
 try {
