@@ -115,7 +115,7 @@ if (function_exists('curl_init')) {
     $body = curl_exec($ch);
     $err = curl_error($ch);
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    // curl_close() is deprecated since PHP 8.5 and has no effect since PHP 8.0.
 
     if (!isCli()) {
         renderWebHeader('Plesk ping');
