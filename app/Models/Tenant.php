@@ -43,6 +43,14 @@ final class Tenant
         return (bool)$stmt->fetchColumn();
     }
 
+    public static function slugExistsForOther(string $slug, int $excludeTenantId): bool
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('SELECT 1 FROM tenants WHERE slug = :slug AND id <> :id LIMIT 1');
+        $stmt->execute(['slug' => $slug, 'id' => $excludeTenantId]);
+        return (bool)$stmt->fetchColumn();
+    }
+
     public static function create(string $slug, string $name, ?string $idType = null, ?string $idNumber = null, ?string $addressFull = null): int
     {
         $pdo = DB::pdo();
@@ -67,6 +75,13 @@ final class Tenant
             'address_full' => $addressFull,
             'logo_path' => $logoPath,
         ]);
+    }
+
+    public static function updateSlug(int $id, string $slug): void
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('UPDATE tenants SET slug = :slug WHERE id = :id');
+        $stmt->execute(['id' => $id, 'slug' => $slug]);
     }
 
     public static function suspend(int $id): void

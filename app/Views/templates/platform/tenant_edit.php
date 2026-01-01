@@ -31,6 +31,14 @@ ob_start();
     <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/edit" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
 
+      <label><?= htmlspecialchars($t('auth.subdomain')) ?></label>
+      <input name="slug" maxlength="32" value="<?= htmlspecialchars((string)($tenant['slug'] ?? '')) ?>" placeholder="miempresa" />
+      <?php if (!empty($_ENV['PLATFORM_BASE_DOMAIN'])): ?>
+        <p class="muted" style="margin-top:6px">
+          Dominio: <span style="font-family: monospace"><?= htmlspecialchars((string)($tenant['slug'] ?? '')) ?>.<?= htmlspecialchars((string)$_ENV['PLATFORM_BASE_DOMAIN']) ?></span>
+        </p>
+      <?php endif; ?>
+
       <label><?= htmlspecialchars($t('auth.company')) ?></label>
       <input name="name" maxlength="180" required value="<?= htmlspecialchars((string)($tenant['name'] ?? '')) ?>" />
 

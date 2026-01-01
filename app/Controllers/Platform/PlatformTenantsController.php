@@ -7,6 +7,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Models\DB;
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Views\View;
 use App\Support\Csrf;
 use App\Support\Env;
@@ -199,8 +200,46 @@ final class PlatformTenantsController
 
         $name = trim((string)($request->post['name'] ?? ''));
         $addressFull = trim((string)($request->post['address_full'] ?? ''));
+        $slugRaw = strtolower(trim((string)($request->post['slug'] ?? (string)($tenant['slug'] ?? ''))));
+        $slug = $slugRaw;
+
+        // Normalize if user pasted a domain.
+        if ($slug !== '' && str_contains($slug, '.')) {
+            $base = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+            if ($base !== '' && str_ends_with($slug, '.' . $base)) {
+                $candidate = substr($slug, 0, -1 * (strlen($base) + 1));
+                if (is_string($candidate)) {
+                    $slug = trim($candidate);
+                }
+            } else {
+                $parts = explode('.', $slug);
+                $slug = trim((string)($parts[0] ?? ''));
+            }
+        }
+
+        $tenantForm = $tenant;
+        $tenantForm['slug'] = $slug;
+
         if ($name === '') {
-            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'error' => 'Completa el nombre']), 422);
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'Completa el nombre']), 422);
+        }
+
+        // Prevent changing the platform tenant slug.
+        if (((string)($tenant['slug'] ?? '')) === 'platform' && $slug !== 'platform') {
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'No se puede cambiar el subdominio del tenant platform']), 422);
+        }
+
+        if ($slug === '') {
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'Completa el subdominio']), 422);
+        }
+
+        // slug: only [a-z0-9-], 3..32
+        if (!preg_match('/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/', $slug)) {
+            $msg = 'Subdominio inválido. Usa solo letras/números/guiones (ej: miempresa)';
+            if ($slugRaw !== '' && str_contains($slugRaw, '.')) {
+                $msg = 'Subdominio inválido. Ingresa solo la etiqueta (ej: "ad"), no el dominio completo.';
+            }
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => $msg]), 422);
         }
 
         $logoPath = (string)($tenant['logo_path'] ?? '');
@@ -210,10 +249,10 @@ final class PlatformTenantsController
             $ext = pathinfo($original, PATHINFO_EXTENSION);
             $ext = is_string($ext) ? strtolower($ext) : '';
             if (!in_array($ext, ['png', 'jpg', 'jpeg', 'webp'], true)) {
-                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'error' => 'Formato de logo inválido (usa PNG/JPG/WebP)']), 422);
+                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'Formato de logo inválido (usa PNG/JPG/WebP)']), 422);
             }
             if (!@getimagesize((string)$logo['tmp_name'])) {
-                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'error' => 'El archivo no parece una imagen válida']), 422);
+                return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => 'El archivo no parece una imagen válida']), 422);
             }
 
             $base = realpath(__DIR__ . '/../../../') ?: (__DIR__ . '/../../../');
@@ -230,8 +269,34 @@ final class PlatformTenantsController
             $logoPath = '/uploads/tenants/' . $id . '/' . $filename;
         }
 
-        Tenant::updateDetails($id, $name, $addressFull !== '' ? $addressFull : null, $logoPath !== '' ? $logoPath : null);
-        return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            if (Tenant::slugExistsForOther($slug, $id)) {
+                throw new \RuntimeException('Ese subdominio ya existe');
+            }
+
+            // Update slug + ensure/update subdomain domain record.
+            if ($slug !== (string)($tenant['slug'] ?? '')) {
+                $baseDomain = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+                if ($baseDomain === '') {
+                    throw new \RuntimeException('Falta PLATFORM_BASE_DOMAIN en .env');
+                }
+                $subdomain = $slug . '.' . $baseDomain;
+                if (TenantDomain::domainExists($subdomain, $id)) {
+                    throw new \RuntimeException('Ese dominio ya está en uso');
+                }
+                Tenant::updateSlug($id, $slug);
+                TenantDomain::upsertSubdomain($id, $subdomain);
+            }
+
+            Tenant::updateDetails($id, $name, $addressFull !== '' ? $addressFull : null, $logoPath !== '' ? $logoPath : null);
+            $pdo->commit();
+            return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenantForm, 'error' => $e->getMessage()]), 422);
+        }
     }
 
     public function suspend(Request $request, array $params): Response

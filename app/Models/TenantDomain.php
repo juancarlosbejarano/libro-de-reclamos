@@ -38,5 +38,39 @@ final class TenantDomain
             throw $e;
         }
     }
+
+    public static function domainExists(string $domain, ?int $excludeTenantId = null): bool
+    {
+        $pdo = DB::pdo();
+        if ($excludeTenantId !== null) {
+            $stmt = $pdo->prepare('SELECT 1 FROM tenant_domains WHERE domain = :d AND tenant_id <> :tid LIMIT 1');
+            $stmt->execute(['d' => $domain, 'tid' => $excludeTenantId]);
+            return (bool)$stmt->fetchColumn();
+        }
+        $stmt = $pdo->prepare('SELECT 1 FROM tenant_domains WHERE domain = :d LIMIT 1');
+        $stmt->execute(['d' => $domain]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    /**
+     * Upserts the tenant subdomain record (kind=subdomain) without changing other domains.
+     */
+    public static function upsertSubdomain(int $tenantId, string $domain): void
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('SELECT id, is_primary FROM tenant_domains WHERE tenant_id = :tid AND kind = "subdomain" ORDER BY is_primary DESC, id ASC LIMIT 1');
+        $stmt->execute(['tid' => $tenantId]);
+        $row = $stmt->fetch();
+
+        if (is_array($row) && (int)($row['id'] ?? 0) > 0) {
+            $id = (int)$row['id'];
+            $stmt = $pdo->prepare('UPDATE tenant_domains SET domain = :d WHERE id = :id');
+            $stmt->execute(['d' => $domain, 'id' => $id]);
+            return;
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO tenant_domains (tenant_id, domain, kind, is_primary, verified_at, created_at) VALUES (:tid, :domain, :kind, 0, NOW(), NOW())');
+        $stmt->execute(['tid' => $tenantId, 'domain' => $domain, 'kind' => 'subdomain']);
+    }
 }
 
