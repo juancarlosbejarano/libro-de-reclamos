@@ -1,0 +1,15 @@
+/* Minimal styles; keep hosting-friendly */
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 0; }
+.container { max-width: 980px; margin: 0 auto; padding: 16px; }
+.nav { display:flex; gap:12px; padding: 12px 0; border-bottom: 1px solid #e5e5e5; }
+.card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px; }
+.row { display:flex; gap: 12px; flex-wrap: wrap; }
+.btn { display:inline-block; padding: 8px 12px; border: 1px solid #333; border-radius: 6px; text-decoration:none; color:#111; background:#fff; }
+.btn.primary { background:#111; color:#fff; }
+.btn.danger { border-color:#b00020; color:#b00020; }
+input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+label { display:block; margin-top: 10px; margin-bottom: 4px; }
+.muted { color:#666; }
+.error { color:#b00020; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }

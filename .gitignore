@@ -1,0 +1,17 @@
+# Environment
+.env
+
+# Installer lock
+storage/install.lock
+
+# Uploads
+storage/uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Logs / temp
+*.log
+*.tmp
