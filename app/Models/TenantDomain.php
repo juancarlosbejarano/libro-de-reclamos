@@ -121,6 +121,64 @@ final class TenantDomain
         return (bool)$stmt->fetchColumn();
     }
 
+    public static function domainExistsExcludingId(string $domain, int $excludeDomainId): bool
+    {
+        $pdo = DB::pdo();
+        $stmt = $pdo->prepare('SELECT 1 FROM tenant_domains WHERE domain = :d AND id <> :id LIMIT 1');
+        $stmt->execute(['d' => $domain, 'id' => $excludeDomainId]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    public static function updateCustomForTenant(int $tenantId, int $domainId, string $domain, bool $makePrimary, bool $verified): void
+    {
+        $pdo = DB::pdo();
+        $row = self::findForTenant($tenantId, $domainId);
+        if (!$row) {
+            throw new \RuntimeException('Dominio no encontrado');
+        }
+        if ((string)($row['kind'] ?? '') !== 'custom') {
+            throw new \RuntimeException('Solo se pueden editar dominios custom');
+        }
+
+        $oldDomain = (string)($row['domain'] ?? '');
+        $domainChanged = strtolower($oldDomain) !== strtolower($domain);
+        if ($domainChanged && self::domainExistsExcludingId($domain, $domainId)) {
+            throw new \RuntimeException('Ese dominio ya está en uso');
+        }
+
+        $pdo->beginTransaction();
+        try {
+            if ($makePrimary) {
+                $stmt = $pdo->prepare('UPDATE tenant_domains SET is_primary = 0 WHERE tenant_id = :tid');
+                $stmt->execute(['tid' => $tenantId]);
+            }
+
+            $verifiedAtSql = null;
+            if ($verified) {
+                $verifiedAtSql = date('Y-m-d H:i:s');
+            } else {
+                // Keep existing verification if domain didn't change
+                if (!$domainChanged && !empty($row['verified_at'])) {
+                    $verifiedAtSql = (string)$row['verified_at'];
+                }
+            }
+
+            $stmt = $pdo->prepare('UPDATE tenant_domains SET domain = :domain, is_primary = :primary, verified_at = :verified_at WHERE tenant_id = :tid AND id = :id');
+            $stmt->execute([
+                'domain' => $domain,
+                'primary' => $makePrimary ? 1 : (int)($row['is_primary'] ?? 0),
+                'verified_at' => $verifiedAtSql,
+                'tid' => $tenantId,
+                'id' => $domainId,
+            ]);
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     /**
      * Upserts the tenant subdomain record (kind=subdomain) without changing other domains.
      */

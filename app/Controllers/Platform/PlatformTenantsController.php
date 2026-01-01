@@ -182,9 +182,19 @@ final class PlatformTenantsController
 
         $domains = TenantDomain::listForTenant($id);
 
+        $editDomainId = (int)($request->query['edit_domain'] ?? 0);
+        $editDomain = null;
+        if ($editDomainId > 0) {
+            $row = TenantDomain::findForTenant($id, $editDomainId);
+            if (is_array($row) && (string)($row['kind'] ?? '') === 'custom') {
+                $editDomain = $row;
+            }
+        }
+
         return Response::html(View::render('platform/tenant_edit', [
             'tenant' => $tenant,
             'domains' => $domains,
+            'editDomain' => $editDomain,
             'saved' => $request->query['saved'] ?? null,
             'error' => $request->query['error'] ?? null,
         ]));
@@ -450,6 +460,84 @@ final class PlatformTenantsController
         } catch (\Throwable $e) {
             $domains = TenantDomain::listForTenant($id);
             return Response::html(View::render('platform/tenant_edit', ['tenant' => $tenant, 'domains' => $domains, 'error' => $e->getMessage()]), 422);
+        }
+    }
+
+    public function domainsUpdate(Request $request, array $params): Response
+    {
+        $guard = $this->requirePlatformUser($request);
+        if ($guard) return $guard;
+
+        $id = (int)($params['id'] ?? 0);
+        $domainId = (int)($params['domainId'] ?? 0);
+        $tenant = $id > 0 ? Tenant::findById($id) : null;
+        if (!$tenant) return Response::html(View::render('platform/tenant_edit', ['tenant' => null]), 404);
+
+        if (!Csrf::verify($request->post['_csrf'] ?? null)) {
+            return Response::redirect('/platform/tenants/' . $id . '/edit?error=csrf');
+        }
+
+        $row = TenantDomain::findForTenant($id, $domainId);
+        if (!$row || (string)($row['kind'] ?? '') !== 'custom') {
+            return Response::redirect('/platform/tenants/' . $id . '/edit');
+        }
+
+        $domainRaw = (string)($request->post['domain'] ?? '');
+        $domain = DomainVerifier::normalizeDomain($domainRaw);
+        $makePrimary = isset($request->post['is_primary']) && (string)$request->post['is_primary'] === '1';
+
+        if ($domain === '') {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', [
+                'tenant' => $tenant,
+                'domains' => $domains,
+                'editDomain' => $row,
+                'error' => 'Dominio requerido',
+            ]), 422);
+        }
+
+        $requiresVerify = Env::bool('DOMAIN_VERIFY_REQUIRED', true);
+        $verified = false;
+        if ($requiresVerify) {
+            $vr = DomainVerifier::verifyCustomDomain($domain, (string)($tenant['slug'] ?? ''));
+            if (!$vr['ok']) {
+                $domains = TenantDomain::listForTenant($id);
+                $row['domain'] = $domain;
+                return Response::html(View::render('platform/tenant_edit', [
+                    'tenant' => $tenant,
+                    'domains' => $domains,
+                    'editDomain' => $row,
+                    'error' => 'Dominio no verificado (' . $vr['reason'] . '). Revisa DNS A/CNAME y vuelve a intentar.',
+                ]), 422);
+            }
+            $verified = true;
+        }
+
+        if ($makePrimary && $requiresVerify && !$verified) {
+            $domains = TenantDomain::listForTenant($id);
+            return Response::html(View::render('platform/tenant_edit', [
+                'tenant' => $tenant,
+                'domains' => $domains,
+                'editDomain' => $row,
+                'error' => 'Primero verifica el dominio antes de marcarlo como principal',
+            ]), 422);
+        }
+
+        try {
+            TenantDomain::updateCustomForTenant($id, $domainId, $domain, $makePrimary, $verified);
+            if ($verified && Env::bool('PLESK_AUTO_PROVISION', true)) {
+                DomainProvisioningJob::enqueueAliasCreate($id, $domain);
+            }
+            return Response::redirect('/platform/tenants/' . $id . '/edit?saved=1');
+        } catch (\Throwable $e) {
+            $domains = TenantDomain::listForTenant($id);
+            $row['domain'] = $domain;
+            return Response::html(View::render('platform/tenant_edit', [
+                'tenant' => $tenant,
+                'domains' => $domains,
+                'editDomain' => $row,
+                'error' => $e->getMessage(),
+            ]), 422);
         }
     }
 

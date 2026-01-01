@@ -5,6 +5,7 @@ $tenant = is_array($tenant ?? null) ? $tenant : null;
 $error = $error ?? null;
 $saved = $saved ?? null;
 $domains = is_array($domains ?? null) ? $domains : [];
+$editDomain = is_array($editDomain ?? null) ? $editDomain : null;
 
 ob_start();
 ?>
@@ -67,18 +68,34 @@ ob_start();
       <p class="muted"><?= htmlspecialchars($t('settings.domain_help')) ?></p>
     </div>
 
-    <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/add" class="card" style="margin-bottom:12px">
-      <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
-      <label><?= htmlspecialchars($t('settings.domain_label')) ?></label>
-      <input name="domain" placeholder="tudominio.com" required />
-      <label>
-        <input type="checkbox" name="is_primary" value="1" />
-        <?= htmlspecialchars($t('settings.domain_primary')) ?>
-      </label>
-      <div style="margin-top:12px">
-        <button class="btn primary" type="submit"><?= htmlspecialchars($t('settings.domain_add')) ?></button>
-      </div>
-    </form>
+    <?php if ($editDomain): ?>
+      <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/<?= (int)$editDomain['id'] ?>/update" class="card" style="margin-bottom:12px">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
+        <label><?= htmlspecialchars($t('settings.domain_label')) ?> (editar)</label>
+        <input name="domain" placeholder="tudominio.com" required value="<?= htmlspecialchars((string)($editDomain['domain'] ?? '')) ?>" />
+        <label>
+          <input type="checkbox" name="is_primary" value="1" <?= ((int)($editDomain['is_primary'] ?? 0) === 1) ? 'checked' : '' ?> />
+          <?= htmlspecialchars($t('settings.domain_primary')) ?>
+        </label>
+        <div style="margin-top:12px">
+          <button class="btn primary" type="submit">Actualizar dominio</button>
+          <a class="btn" href="/platform/tenants/<?= (int)$tenant['id'] ?>/edit">Cancelar</a>
+        </div>
+      </form>
+    <?php else: ?>
+      <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/add" class="card" style="margin-bottom:12px">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
+        <label><?= htmlspecialchars($t('settings.domain_label')) ?></label>
+        <input name="domain" placeholder="tudominio.com" required />
+        <label>
+          <input type="checkbox" name="is_primary" value="1" />
+          <?= htmlspecialchars($t('settings.domain_primary')) ?>
+        </label>
+        <div style="margin-top:12px">
+          <button class="btn primary" type="submit"><?= htmlspecialchars($t('settings.domain_add')) ?></button>
+        </div>
+      </form>
+    <?php endif; ?>
 
     <div class="card">
       <table class="table">
@@ -114,6 +131,7 @@ ob_start();
                 <?php endif; ?>
 
                 <?php if (((string)($d['kind'] ?? '')) === 'custom'): ?>
+                  <a class="btn" href="/platform/tenants/<?= (int)$tenant['id'] ?>/edit?edit_domain=<?= (int)$d['id'] ?>">Editar</a>
                   <form method="post" action="/platform/tenants/<?= (int)$tenant['id'] ?>/domains/<?= (int)$d['id'] ?>/delete" style="display:inline" onsubmit="return confirm('¿Eliminar dominio?');">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf()) ?>" />
                     <button class="btn danger" type="submit">Eliminar</button>

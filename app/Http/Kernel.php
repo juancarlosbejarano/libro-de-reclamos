@@ -79,6 +79,7 @@ final class Kernel
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/add$#', [new PlatformTenantsController(), 'domainsAdd']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/(?P<domainId>\d+)/verify$#', [new PlatformTenantsController(), 'domainsVerify']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/(?P<domainId>\d+)/primary$#', [new PlatformTenantsController(), 'domainsPrimary']);
+        $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/(?P<domainId>\d+)/update$#', [new PlatformTenantsController(), 'domainsUpdate']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/domains/(?P<domainId>\d+)/delete$#', [new PlatformTenantsController(), 'domainsDelete']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/suspend$#', [new PlatformTenantsController(), 'suspend']);
         $this->router->add('POST', '#^/platform/tenants/(?P<id>\d+)/reactivate$#', [new PlatformTenantsController(), 'reactivate']);
