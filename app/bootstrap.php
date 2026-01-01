@@ -16,7 +16,25 @@ spl_autoload_register(function (string $class): void {
 
 use App\Support\Env;
 
-Env::load(__DIR__ . '/../.env');
+// Load .env from common locations (Plesk deployments may place it in different folders).
+$envCandidates = [
+    __DIR__ . '/../.env',
+    __DIR__ . '/../httpdocs/.env',
+];
+if (isset($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT']) && $_SERVER['DOCUMENT_ROOT'] !== '') {
+    $envCandidates[] = rtrim($_SERVER['DOCUMENT_ROOT'], '/\\') . '/.env';
+}
+$cwd = getcwd();
+if (is_string($cwd) && $cwd !== '') {
+    $envCandidates[] = rtrim($cwd, '/\\') . '/.env';
+}
+
+foreach ($envCandidates as $p) {
+    if (is_string($p) && $p !== '' && is_file($p)) {
+        Env::load($p);
+        break;
+    }
+}
 
 // Sessions (for UI auth)
 $sessionName = Env::get('SESSION_NAME', 'LIBROSESSID');
