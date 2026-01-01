@@ -63,7 +63,26 @@ final class PlatformTenantsController
         $idNumber = preg_replace('/\D+/', '', $idNumberRaw) ?? '';
         $name = trim((string)($request->post['name'] ?? ''));
         $addressFull = trim((string)($request->post['address_full'] ?? ''));
-        $slug = strtolower(trim((string)($request->post['slug'] ?? '')));
+        $slugRaw = strtolower(trim((string)($request->post['slug'] ?? '')));
+        $slug = $slugRaw;
+
+        // Users sometimes paste a full domain here (e.g. "ad.jbsistemas.com").
+        // This field expects only the subdomain label (e.g. "ad").
+        if ($slug !== '' && str_contains($slug, '.')) {
+            $base = strtolower(trim((string)(Env::get('PLATFORM_BASE_DOMAIN', '') ?? '')));
+
+            // If they pasted "slug.baseDomain", strip the base.
+            if ($base !== '' && str_ends_with($slug, '.' . $base)) {
+                $candidate = substr($slug, 0, -1 * (strlen($base) + 1));
+                if (is_string($candidate)) {
+                    $slug = trim($candidate);
+                }
+            } else {
+                // Otherwise, take the first label.
+                $parts = explode('.', $slug);
+                $slug = trim((string)($parts[0] ?? ''));
+            }
+        }
 
         $form = [
             'id_type' => $idType,
@@ -107,7 +126,11 @@ final class PlatformTenantsController
 
         // slug: only [a-z0-9-], 3..32
         if (!preg_match('/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/', $slug)) {
-            return Response::html(View::render('platform/tenant_create', ['error' => 'Subdominio inválido (usa letras/números/guiones)', 'form' => $form]), 422);
+            $msg = 'Subdominio inválido. Usa solo letras/números/guiones (ej: miempresa)';
+            if ($slugRaw !== '' && str_contains($slugRaw, '.')) {
+                $msg = 'Subdominio inválido. Ingresa solo la etiqueta (ej: "ad"), no el dominio completo.';
+            }
+            return Response::html(View::render('platform/tenant_create', ['error' => $msg, 'form' => $form]), 422);
         }
 
         if (Tenant::slugExists($slug)) {
