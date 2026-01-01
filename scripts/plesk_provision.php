@@ -153,6 +153,18 @@ foreach ($jobs as $job) {
     $err = ($res['error'] ?? 'unknown') . ' (http ' . (string)$res['status'] . ')';
     DomainProvisioningJob::markFailed($id, $err);
     outLn("FAIL {$domain}: {$err}");
+
+    // Helpful diagnostics for manual runs (owner-only on web).
+    $body = (string)($res['body'] ?? '');
+    $body = trim($body);
+    if ($body !== '') {
+        $bodyOneLine = preg_replace('~\s+~', ' ', $body);
+        $bodyOneLine = trim((string)$bodyOneLine);
+        if (strlen($bodyOneLine) > 700) {
+            $bodyOneLine = substr($bodyOneLine, 0, 700) . '…';
+        }
+        outLn('Response snippet: ' . $bodyOneLine);
+    }
 }
 
 try {

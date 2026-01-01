@@ -115,6 +115,8 @@ if (function_exists('curl_init')) {
     $body = curl_exec($ch);
     $err = curl_error($ch);
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            echo '<p class="muted">PHP: <strong>' . htmlspecialchars(PHP_VERSION, ENT_QUOTES, 'UTF-8') . '</strong></p>';
+            echo '<p class="muted">.env cargado desde: <strong>' . htmlspecialchars($loadedEnv ?: '(no encontrado)', ENT_QUOTES, 'UTF-8') . '</strong></p>';
     // curl_close() is deprecated since PHP 8.5 and has no effect since PHP 8.0.
 
     if (!isCli()) {
