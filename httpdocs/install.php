@@ -192,6 +192,32 @@ function render(string $title, string $bodyHtml): void
     echo '</body></html>';
 }
 
+function ensureDir(string $path): void
+{
+    if (!is_dir($path)) {
+        @mkdir($path, 0775, true);
+    }
+    // Best-effort: on some hosts chmod may be restricted.
+    @chmod($path, 0775);
+    if (!is_writable($path)) {
+        // Last resort (some Plesk setups require group/world write)
+        @chmod($path, 0777);
+    }
+}
+
+/** @return array<string,bool> */
+function computeWritableChecks(string $rootDir, string $envFile): array
+{
+    ensureDir($rootDir . '/storage');
+    ensureDir($rootDir . '/storage/uploads');
+
+    return [
+        $envFile => (is_file($envFile) ? is_writable($envFile) : is_writable($rootDir)),
+        $rootDir . '/storage' => (is_dir($rootDir . '/storage') && is_writable($rootDir . '/storage')),
+        $rootDir . '/storage/uploads' => (is_dir($rootDir . '/storage/uploads') && is_writable($rootDir . '/storage/uploads')),
+    ];
+}
+
 // --- lock check ------------------------------------------------------------
 
 if (is_file($lockFile)) {
@@ -216,11 +242,7 @@ $requirements = [
     'ext-curl (recomendado para Plesk/Chatwoot)' => extension_loaded('curl'),
 ];
 
-$writableChecks = [
-    $envFile => (is_file($envFile) ? is_writable($envFile) : is_writable($rootDir)),
-    $rootDir . '/storage' => (is_dir($rootDir . '/storage') && is_writable($rootDir . '/storage')),
-    $rootDir . '/storage/uploads' => (is_dir($rootDir . '/storage/uploads') && is_writable($rootDir . '/storage/uploads')),
-];
+$writableChecks = computeWritableChecks($rootDir, $envFile);
 
 // --- UI -------------------------------------------------------------------
 
@@ -244,6 +266,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         $reqHtml .= '<li>' . h(str_replace('\\', '/', $path)) . ': ' . ($ok ? 'OK' : 'NO ESCRIBIBLE') . '</li>';
     }
     $reqHtml .= '</ul>';
+    if (in_array(false, array_values($writableChecks), true)) {
+        $reqHtml .= '<p class="muted">Si ves NO ESCRIBIBLE, en Plesk ajusta permisos/propietario de <code>storage/</code> y <code>storage/uploads/</code> (p.ej. 775) o usa la opción de Plesk para “Fix Permissions”.</p>';
+    }
     $reqHtml .= '</div>';
 
     $reqHtml .= '<form method="post" class="card" style="margin-top:12px">';
@@ -295,6 +320,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $data = postData();
 $errors = [];
+
+// Re-check permissions (and attempt to fix) on POST as well.
+$writableChecks = computeWritableChecks($rootDir, $envFile);
 
 foreach ($requirements as $label => $ok) {
     if (!$ok) $errors[] = 'Falta requisito: ' . $label;
